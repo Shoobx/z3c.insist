@@ -1,4 +1,4 @@
-"""insist -- Persistence to ini files"""
+"""z3c.insist -- Persistence to ini files"""
 import ConfigParser
 from cStringIO import StringIO
 

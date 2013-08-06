@@ -11,7 +11,7 @@ def read_file(filename):
     return open(os.path.join(os.path.dirname(__file__), filename)).read()
 
 setup(
-    name="insist",
+    name="z3c.insist",
     version='0.1.0dev',
     author="Shoobx, Inc.",
     author_email="dev@shoobx.com",
@@ -34,6 +34,7 @@ setup(
     ],
     packages=find_packages('src'),
     package_dir={'': 'src'},
+    namespace_packages=['z3c', ],
     include_package_data=True,
     zip_safe=False,
     extras_require=dict(

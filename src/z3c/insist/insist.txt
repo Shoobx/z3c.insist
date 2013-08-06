@@ -1,6 +1,6 @@
-==================================
-insist -- Persistence to ini files
-==================================
+======================================
+z3c.insist -- Persistence to ini files
+======================================
 
 Suppose we have an object with some schema:
 
@@ -19,8 +19,8 @@ Suppose we have an object with some schema:
 Now we can create a store that will dump and restore the state of an
 object in an *.ini file:
 
-    >>> import insist.insist
-    >>> store = insist.insist.ConfigurationStore(IPerson, 'person')
+    >>> import z3c.insist.insist
+    >>> store = z3c.insist.insist.ConfigurationStore(IPerson, 'person')
     >>> state = store.dumps(p)
     >>> print state
     [person]
