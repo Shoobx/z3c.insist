@@ -1,4 +1,35 @@
+==================================
+insist -- Persistence to ini files
+==================================
 
+Suppose we have an object with some schema:
 
-   >>> 2 + 2
-   4
+    >>> import zope.interface
+    >>> import zope.schema
+
+    >>> class Person(object):
+    ...     firstname = u"Albertas"
+    ...     lastname = u"Agejevas"
+    >>> p = Person()
+
+    >>> class IPerson(zope.interface.Interface):
+    ...     firstname = zope.schema.TextLine(title=u"First Name")
+    ...     lastname = zope.schema.TextLine(title=u"Last Name")
+
+Now we can create a store that will dump and restore the state of an
+object in an *.ini file:
+
+    >>> import insist.insist
+    >>> store = insist.insist.ConfigurationStore(IPerson, 'person')
+    >>> state = store.dumps(p)
+    >>> print state
+    [person]
+    firstname = Albertas
+    lastname = Agejevas
+
+Similarly, the store can load the object state from a config file:
+
+    >>> p.firstname = u'Al'
+    >>> store.loads(p, state)
+    >>> p.firstname
+    'Albertas'

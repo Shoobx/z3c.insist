@@ -43,7 +43,7 @@ setup(
               'junitxml',
               ],),
     install_requires=[
-        'zope.interface',
+        'zope.schema',
         'zope.component',
     ]
 )
