@@ -1,0 +1,6 @@
+bin/
+ve/
+parts/
+.installed.cfg
+bootstrap.py
+
