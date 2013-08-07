@@ -10,11 +10,14 @@ Suppose we have an object with some schema:
     >>> class Person(object):
     ...     firstname = u"Albertas"
     ...     lastname = u"Agejevas"
+    ...     weight = 42
+
     >>> p = Person()
 
     >>> class IPerson(zope.interface.Interface):
     ...     firstname = zope.schema.TextLine(title=u"First Name")
     ...     lastname = zope.schema.TextLine(title=u"Last Name")
+    ...     weight = zope.schema.Int(title=u"Weight")
 
 Now we can create a store that will dump and restore the state of an
 object in an *.ini file:
@@ -26,6 +29,7 @@ object in an *.ini file:
     [person]
     firstname = Albertas
     lastname = Agejevas
+    weight = 42
 
 Similarly, the store can load the object state from a config file:
 

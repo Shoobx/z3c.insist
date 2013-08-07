@@ -56,19 +56,36 @@ class ConfigurationStore(object):
         self.load(config)
 
 
-@zope.component.adapter(
-    zope.schema.interfaces.ITextLine, zope.interface.Interface)
 @zope.interface.implementer(interfaces.IFieldSerializer)
-class TextFieldSerializer(object):
+class FieldSerializer(object):
     def __init__(self, field, context):
         self.field = field
         self.context = context
 
     def serialize(self):
         value = getattr(self.context, self.field.__name__)
-        return value.encode('utf-8')
+        return self.serializeValue(value)
 
     def deserialize(self, value):
-        decoded = unicode(value, 'utf-8')
+        decoded = self.deserializeValue(value)
         setattr(self.context, self.field.__name__, decoded)
 
+
+@zope.component.adapter(
+    zope.schema.interfaces.ITextLine, zope.interface.Interface)
+class TextFieldSerializer(FieldSerializer):
+    def serializeValue(self, value):
+        return value.encode('utf-8')
+
+    def deserializeValue(self, value):
+        return unicode(value, 'utf-8')
+
+
+@zope.component.adapter(
+    zope.schema.interfaces.IInt, zope.interface.Interface)
+class IntFieldSerializer(FieldSerializer):
+    def serializeValue(self, value):
+        return str(value)
+
+    def deserializeValue(self, value):
+        return int(value)

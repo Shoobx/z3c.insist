@@ -13,6 +13,7 @@ from z3c.insist import insist
 def setUp(test):
     zope.component.testing.setUp(test)
     zope.component.provideAdapter(insist.TextFieldSerializer)
+    zope.component.provideAdapter(insist.IntFieldSerializer)
 
 
 def tearDown(test):
