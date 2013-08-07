@@ -46,5 +46,6 @@ setup(
     install_requires=[
         'zope.schema',
         'zope.component',
+        'zope.lifecycleevent',
     ]
 )

@@ -6,6 +6,8 @@
 """z3c.insist -- Persistence to ini files"""
 
 import zope.interface
+from zope.lifecycleevent import ObjectModifiedEvent
+from zope.lifecycleevent.interfaces import IObjectModifiedEvent
 
 
 class IConfigurationStore(zope.interface.Interface):
@@ -48,3 +50,16 @@ class IFieldSerializer(zope.interface.Interface):
 
     def deserialize(state):
         """Set the field value from a given serialized state"""
+
+
+class IObjectConfigurationLoadedEvent(IObjectModifiedEvent):
+    """Object configuration loaded event interface"""
+
+
+@zope.interface.implementer(IObjectConfigurationLoadedEvent)
+class ObjectConfigurationLoadedEvent(ObjectModifiedEvent):
+    """Object configuration loaded"""
+
+
+class ConfigurationLoadError(Exception):
+    """Configuration load error"""
