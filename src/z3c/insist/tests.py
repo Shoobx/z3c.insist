@@ -8,7 +8,7 @@ import unittest
 import zope.component
 import zope.component.testing
 
-from z3c.insist import insist
+from z3c.insist import insist, testing
 
 
 class INoneTestSchema(zope.interface.Interface):
@@ -58,8 +58,7 @@ def doctest_FieldSerializer_None():
 
 def setUp(test):
     zope.component.testing.setUp(test)
-    zope.component.provideAdapter(insist.TextFieldSerializer)
-    zope.component.provideAdapter(insist.IntFieldSerializer)
+    testing.setUpSerializers()
 
 
 def tearDown(test):

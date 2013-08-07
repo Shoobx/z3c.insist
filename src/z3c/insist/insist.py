@@ -34,6 +34,7 @@ class ConfigurationStore(object):
             config = ConfigParser.SafeConfigParser()
         config.add_section(self.section)
         for fn, field in zope.schema.getFieldsInOrder(self.schema):
+            __traceback_info__ = (self.section, self.schema, fn)
             serializer = zope.component.getMultiAdapter(
                 (field, self.context), interfaces.IFieldSerializer)
             state = serializer.serialize()
@@ -48,6 +49,7 @@ class ConfigurationStore(object):
 
     def load(self, config):
         for fn, field in zope.schema.getFieldsInOrder(self.schema):
+            __traceback_info__ = (self.section, self.schema, fn)
             serializer = zope.component.getMultiAdapter(
                 (field, self.context), interfaces.IFieldSerializer)
             serializer.deserialize(config.get(self.section, fn))
