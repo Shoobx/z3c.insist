@@ -37,7 +37,7 @@ class ConfigurationStore(object):
             __traceback_info__ = (self.section, self.schema, fn)
             serializer = zope.component.getMultiAdapter(
                 (field, self.context), interfaces.IFieldSerializer)
-            state = serializer.serialize()
+            state = serializer.serialize(self)
             config.set(self.section, fn, state)
         return config
 
@@ -52,7 +52,7 @@ class ConfigurationStore(object):
             __traceback_info__ = (self.section, self.schema, fn)
             serializer = zope.component.getMultiAdapter(
                 (field, self.context), interfaces.IFieldSerializer)
-            serializer.deserialize(config.get(self.section, fn))
+            serializer.deserialize(config.get(self.section, fn), self)
 
     def loads(self, cfgstr):
         buf = StringIO(cfgstr)
@@ -103,17 +103,23 @@ class FieldSerializer(object):
         self.field = field
         self.context = context
 
-    def serialize(self):
+    def serialize(self, store):
         value = getattr(self.context, self.field.__name__)
         if value is None:
             return self.none_marker
+        elif hasattr(store, 'dump_' + self.field.__name__):
+            # Legacy hook
+            return getattr(store, 'dump_' + self.field.__name__)(value)
         else:
             result = self.serializeValue(value)
             return result.replace(self.escape, self.escape * 2)
 
-    def deserialize(self, value):
+    def deserialize(self, value, store):
         if value == self.none_marker:
             decoded = None
+        elif hasattr(store, 'load_' + self.field.__name__):
+            # Legacy hook
+            decoded = getattr(store, 'load_' + self.field.__name__)(value)
         else:
             value = value.replace(self.escape * 2, self.escape)
             decoded = self.deserializeValue(value)
