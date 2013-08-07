@@ -8,6 +8,7 @@ import ConfigParser
 from cStringIO import StringIO
 
 import zope.schema
+import zope.component
 
 from z3c.insist import interfaces
 
@@ -30,7 +31,10 @@ class ConfigurationStore(object):
     def dump(self, config):
         config.add_section(self.section)
         for fn, field in zope.schema.getFieldsInOrder(self.schema):
-            config.set(self.section, fn, str(getattr(self.context, fn)))
+            serializer = zope.component.getMultiAdapter(
+                (field, self.context), interfaces.IFieldSerializer)
+            state = serializer.serialize()
+            config.set(self.section, fn, state)
 
     def dumps(self):
         config = ConfigParser.SafeConfigParser()
@@ -41,10 +45,30 @@ class ConfigurationStore(object):
 
     def load(self, config):
         for fn, field in zope.schema.getFieldsInOrder(self.schema):
-            setattr(self.context, fn, config.get(self.section, fn))
+            serializer = zope.component.getMultiAdapter(
+                (field, self.context), interfaces.IFieldSerializer)
+            serializer.deserialize(config.get(self.section, fn))
 
     def loads(self, cfgstr):
         buf = StringIO(cfgstr)
         config = ConfigParser.SafeConfigParser()
         config.readfp(buf)
         self.load(config)
+
+
+@zope.component.adapter(
+    zope.schema.interfaces.ITextLine, zope.interface.Interface)
+@zope.interface.implementer(interfaces.IFieldSerializer)
+class TextFieldSerializer(object):
+    def __init__(self, field, context):
+        self.field = field
+        self.context = context
+
+    def serialize(self):
+        value = getattr(self.context, self.field.__name__)
+        return value.encode('utf-8')
+
+    def deserialize(self, value):
+        decoded = unicode(value, 'utf-8')
+        setattr(self.context, self.field.__name__, decoded)
+

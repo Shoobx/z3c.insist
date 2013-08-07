@@ -32,4 +32,4 @@ Similarly, the store can load the object state from a config file:
     >>> p.firstname = u'Al'
     >>> store.loads(state)
     >>> p.firstname
-    'Albertas'
+    u'Albertas'
