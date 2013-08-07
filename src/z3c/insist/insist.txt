@@ -19,9 +19,9 @@ Suppose we have an object with some schema:
 Now we can create a store that will dump and restore the state of an
 object in an *.ini file:
 
-    >>> import z3c.insist.insist
-    >>> store = z3c.insist.insist.ConfigurationStore(IPerson, 'person')
-    >>> state = store.dumps(p)
+    >>> from z3c.insist import insist
+    >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+    >>> state = store.dumps()
     >>> print state
     [person]
     firstname = Albertas
@@ -30,6 +30,6 @@ object in an *.ini file:
 Similarly, the store can load the object state from a config file:
 
     >>> p.firstname = u'Al'
-    >>> store.loads(p, state)
+    >>> store.loads(state)
     >>> p.firstname
     'Albertas'
