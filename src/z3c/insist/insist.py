@@ -12,6 +12,7 @@ import zope.component
 
 from z3c.insist import interfaces
 
+
 @zope.interface.implementer(interfaces.IConfigurationStore)
 class ConfigurationStore(object):
 
@@ -28,8 +29,9 @@ class ConfigurationStore(object):
             store.section = section
         return store
 
-    def dump(self):
-        config = ConfigParser.SafeConfigParser()
+    def dump(self, config=None):
+        if config is None:
+            config = ConfigParser.SafeConfigParser()
         config.add_section(self.section)
         for fn, field in zope.schema.getFieldsInOrder(self.schema):
             serializer = zope.component.getMultiAdapter(
@@ -55,6 +57,39 @@ class ConfigurationStore(object):
         config = ConfigParser.SafeConfigParser()
         config.readfp(buf)
         self.load(config)
+
+
+class CollectionConfigurationStore(ConfigurationStore):
+    """A configuration store for collections.
+
+    Subclasses must provide the following attributes:
+
+       * schema
+       * section_prefix
+       * item_factory
+    """
+
+    def dump(self):
+        config = super(CollectionConfigurationStore, self).dump()
+        for k, v in self.context.items():
+            store = interfaces.IConfigurationStore(v)
+            store.section = self.section_prefix + k
+            store.dump(config)
+        return config
+
+    def load(self, config):
+        super(CollectionConfigurationStore, self).load(config)
+
+        for k in list(self.context):
+            del self.context[k]
+
+        for section in config.sections:
+            if not section.startswith(self.section_prefix):
+                continue
+            store = interfaces.IConfigurationStore(self.item_factory())
+            store.section = section
+            store.load(config)
+        return config
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
