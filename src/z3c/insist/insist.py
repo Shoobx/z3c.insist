@@ -15,7 +15,7 @@ from z3c.insist import interfaces
 @zope.interface.implementer(interfaces.IConfigurationStore)
 class ConfigurationStore(object):
 
-    section = 'default'
+    section = 'object'
 
     def __init__(self, context):
         self.context = context
@@ -58,16 +58,27 @@ class ConfigurationStore(object):
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
 class FieldSerializer(object):
+    escape = '!'
+    none_marker = '!None'
+
     def __init__(self, field, context):
         self.field = field
         self.context = context
 
     def serialize(self):
         value = getattr(self.context, self.field.__name__)
-        return self.serializeValue(value)
+        if value is None:
+            return self.none_marker
+        else:
+            result = self.serializeValue(value)
+            return result.replace(self.escape, self.escape * 2)
 
     def deserialize(self, value):
-        decoded = self.deserializeValue(value)
+        if value == self.none_marker:
+            decoded = None
+        else:
+            value = value.replace(self.escape * 2, self.escape)
+            decoded = self.deserializeValue(value)
         setattr(self.context, self.field.__name__, decoded)
 
 

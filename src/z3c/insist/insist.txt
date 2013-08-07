@@ -11,6 +11,7 @@ Suppose we have an object with some schema:
     ...     firstname = u"Albertas"
     ...     lastname = u"Agejevas"
     ...     weight = 42
+    ...     yacht = None
 
     >>> p = Person()
 
@@ -18,6 +19,7 @@ Suppose we have an object with some schema:
     ...     firstname = zope.schema.TextLine(title=u"First Name")
     ...     lastname = zope.schema.TextLine(title=u"Last Name")
     ...     weight = zope.schema.Int(title=u"Weight")
+    ...     yacht = zope.schema.TextLine(title=u"Yacht Name")
 
 Now we can create a store that will dump and restore the state of an
 object in an *.ini file:
@@ -30,10 +32,15 @@ object in an *.ini file:
     firstname = Albertas
     lastname = Agejevas
     weight = 42
+    yacht = !None
 
 Similarly, the store can load the object state from a config file:
 
-    >>> p.firstname = u'Al'
+    >>> p.firstname = p.lastname = p.weight = p.yacht = None
     >>> store.loads(state)
-    >>> p.firstname
-    u'Albertas'
+    >>> from pprint import pprint
+    >>> pprint(p.__dict__)
+    {'firstname': u'Albertas',
+     'lastname': u'Agejevas',
+     'weight': 42,
+     'yacht': None}
