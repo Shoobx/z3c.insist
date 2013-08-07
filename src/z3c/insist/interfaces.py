@@ -20,10 +20,22 @@ class IConfigurationStore(zope.interface.Interface):
         )
 
     def dump():
-        """Serialize the context to the configuration file"""
+        """Serialize the context to the configuration file.
 
-    def load():
-        """Load the object state from the configuration file"""
+        Returns a ConfigParser object.
+        """
+
+    def load(config):
+        """Load the object state from the configuration file."""
+
+    def dumps():
+        """Serialize the context to the configuration file.
+
+        Returns a string.
+        """
+
+    def load(config):
+        """Load the object state from the configuration as a string."""
 
 
 class IFieldSerializer(zope.interface.Interface):

@@ -28,17 +28,18 @@ class ConfigurationStore(object):
             store.section = section
         return store
 
-    def dump(self, config):
+    def dump(self):
+        config = ConfigParser.SafeConfigParser()
         config.add_section(self.section)
         for fn, field in zope.schema.getFieldsInOrder(self.schema):
             serializer = zope.component.getMultiAdapter(
                 (field, self.context), interfaces.IFieldSerializer)
             state = serializer.serialize()
             config.set(self.section, fn, state)
+        return config
 
     def dumps(self):
-        config = ConfigParser.SafeConfigParser()
-        self.dump(config)
+        config = self.dump()
         buf = StringIO()
         config.write(buf)
         return buf.getvalue()
