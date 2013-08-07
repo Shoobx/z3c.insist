@@ -30,7 +30,8 @@ def doctest_FieldSerializer_None():
     """Test escaping of None values and handling of the escape character
 
        >>> obj = NoneTestObject()
-       >>> store = insist.ConfigurationStore.makeStore(obj, ITestSchema, 'test')
+       >>> store = insist.ConfigurationStore.makeStore(
+       ...     obj, INoneTestSchema, 'test')
 
     Nones and bangs get escaped:
 
