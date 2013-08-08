@@ -83,8 +83,8 @@ class CollectionConfigurationStore(ConfigurationStore):
        * item_factory
     """
 
-    def dump(self):
-        config = super(CollectionConfigurationStore, self).dump()
+    def dump(self, config=None):
+        config = super(CollectionConfigurationStore, self).dump(config)
         for k, v in self.context.items():
             store = interfaces.IConfigurationStore(v)
             store.section = self.section_prefix + k
