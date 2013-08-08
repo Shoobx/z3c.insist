@@ -60,8 +60,9 @@ class ConfigurationStore(object):
             __traceback_info__ = (self.section, self.schema, fn)
             if hasattr(self, 'load_%s' % fn):
                 serializer = CustomSerializer(field, self.context, self)
-            serializer = zope.component.getMultiAdapter(
-                (field, self.context), interfaces.IFieldSerializer)
+            else:
+                serializer = zope.component.getMultiAdapter(
+                    (field, self.context), interfaces.IFieldSerializer)
             serializer.deserialize(config.get(self.section, fn))
 
     def loads(self, cfgstr):

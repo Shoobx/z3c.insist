@@ -45,6 +45,10 @@ Similarly, the store can load the object state from a config file:
      'weight': 42,
      'yacht': None}
 
+
+Fields
+~~~~~~
+
 The store can provide an attribute with a list of fields to process:
 
     >>> store.fields = ('firstname', 'lastname')
@@ -62,3 +66,28 @@ It works for loading, too:
     ... yacht = Titanic
     ... """)
     >>> p.yacht
+
+
+Custom field serialization
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The store can have custom methods to load and dump particular fields:
+
+    >>> def dump_lastname(value):
+    ...     return value.upper()
+    >>> store.dump_lastname = dump_lastname
+    >>> print store.dumps()
+    [person]
+    firstname = Albertas
+    lastname = AGEJEVAS
+
+    >>> def load_lastname(value):
+    ...     return value.title()
+    >>> store.load_lastname = load_lastname
+    >>> store.loads("""\
+    ... [person]
+    ... firstname = Albertas
+    ... lastname = AGEJEVAS
+    ... """)
+    >>> p.lastname
+    'Agejevas'
