@@ -70,6 +70,8 @@ class ConfigurationStore(object):
         for fn, field in zope.schema.getFieldsInOrder(self.schema):
             if self.fields is not None and fn not in self.fields:
                 continue
+            if not config.has_option(self.section, fn):
+                continue
             __traceback_info__ = (self.section, self.schema, fn)
             if hasattr(self, 'load_%s' % fn):
                 serializer = CustomSerializer(field, self.context, self)

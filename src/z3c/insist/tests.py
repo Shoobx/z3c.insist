@@ -55,6 +55,27 @@ def doctest_FieldSerializer_None():
 
     """
 
+def doctest_ConfigurationStore_load_missing_values():
+    r"""Test that missing configuration values are handled fine.
+
+       >>> obj = NoneTestObject()
+       >>> store = insist.ConfigurationStore.makeStore(
+       ...     obj, INoneTestSchema, 'test')
+
+       >>> store.loads('''\
+       ... [test]
+       ... test1 = foo
+       ... ''')
+
+       >>> obj.test1
+       u'foo'
+       >>> obj.test2
+       >>> obj.test3
+       u'To infinity! And beyond!'
+       >>> obj.test4
+
+    """
+
 
 def doctest_ConfigurationStore_section():
     """The section name defaults to the interface name.
