@@ -35,9 +35,12 @@ class ConfigurationStore(object):
         config.add_section(self.section)
         for fn, field in zope.schema.getFieldsInOrder(self.schema):
             __traceback_info__ = (self.section, self.schema, fn)
-            serializer = zope.component.getMultiAdapter(
-                (field, self.context), interfaces.IFieldSerializer)
-            state = serializer.serialize(self)
+            if hasattr(self, 'dump_%s' % fn):
+                serializer = CustomSerializer(field, self.context, self)
+            else:
+                serializer = zope.component.getMultiAdapter(
+                    (field, self.context), interfaces.IFieldSerializer)
+            state = serializer.serialize()
             config.set(self.section, fn, state)
         return config
 
@@ -50,9 +53,11 @@ class ConfigurationStore(object):
     def load(self, config):
         for fn, field in zope.schema.getFieldsInOrder(self.schema):
             __traceback_info__ = (self.section, self.schema, fn)
+            if hasattr(self, 'load_%s' % fn):
+                serializer = CustomSerializer(field, self.context, self)
             serializer = zope.component.getMultiAdapter(
                 (field, self.context), interfaces.IFieldSerializer)
-            serializer.deserialize(config.get(self.section, fn), self)
+            serializer.deserialize(config.get(self.section, fn))
 
     def loads(self, cfgstr):
         buf = StringIO(cfgstr)
@@ -103,23 +108,17 @@ class FieldSerializer(object):
         self.field = field
         self.context = context
 
-    def serialize(self, store):
+    def serialize(self):
         value = getattr(self.context, self.field.__name__)
         if value is None:
             return self.none_marker
-        elif hasattr(store, 'dump_' + self.field.__name__):
-            # Legacy hook
-            return getattr(store, 'dump_' + self.field.__name__)(value)
         else:
             result = self.serializeValue(value)
             return result.replace(self.escape, self.escape * 2)
 
-    def deserialize(self, value, store):
+    def deserialize(self, value):
         if value == self.none_marker:
             decoded = None
-        elif hasattr(store, 'load_' + self.field.__name__):
-            # Legacy hook
-            decoded = getattr(store, 'load_' + self.field.__name__)(value)
         else:
             value = value.replace(self.escape * 2, self.escape)
             decoded = self.deserializeValue(value)
@@ -144,3 +143,20 @@ class IntFieldSerializer(FieldSerializer):
 
     def deserializeValue(self, value):
         return int(value)
+
+
+class CustomSerializer(FieldSerializer):
+    """Allow a field-specific method on storage handle the value"""
+
+    def __init__(self, field, context, store):
+        self.field = field
+        self.context = context
+        self.store = store
+
+    def serialize(self):
+        value = getattr(self.context, self.field.__name__)
+        return getattr(self.store, 'dump_' + self.field.__name__)(value)
+
+    def deserialize(self, value):
+        decoded = getattr(self.store, 'load_' + self.field.__name__)(value)
+        setattr(self.context, self.field.__name__, decoded)
