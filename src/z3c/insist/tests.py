@@ -56,6 +56,23 @@ def doctest_FieldSerializer_None():
     """
 
 
+def doctest_ConfigurationStore_section():
+    """The section name defaults to the interface name.
+
+       >>> obj = NoneTestObject()
+       >>> store = insist.ConfigurationStore(obj)
+       >>> store.schema = INoneTestSchema
+
+       >>> store.section
+       'INoneTestSchema'
+
+       >>> store.section = 'specific'
+       >>> store.section
+       'specific'
+
+    """
+
+
 def setUp(test):
     zope.component.testing.setUp(test)
     testing.setUpSerializers()

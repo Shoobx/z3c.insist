@@ -17,11 +17,23 @@ from z3c.insist import interfaces
 @zope.interface.implementer(interfaces.IConfigurationStore)
 class ConfigurationStore(object):
 
-    section = 'object'
+    _section = None
     fields = None
+    root = None
 
     def __init__(self, context):
         self.context = context
+
+    @property
+    def section(self):
+        if self._section is None:
+            return self.schema.__name__
+        else:
+            return self._section
+
+    @section.setter
+    def section(self, value):
+        self._section = value
 
     @classmethod
     def makeStore(cls, value, schema, section=None):
