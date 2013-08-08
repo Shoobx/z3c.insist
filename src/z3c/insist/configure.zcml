@@ -2,4 +2,5 @@
     xmlns="http://namespaces.zope.org/zope">
   <adapter factory=".insist.TextFieldSerializer" />
   <adapter factory=".insist.IntFieldSerializer" />
+  <adapter factory=".insist.ChoiceFieldSerializer" />
 </configure>

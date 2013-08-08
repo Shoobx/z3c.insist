@@ -15,4 +15,5 @@ from z3c.insist import insist
 def setUpSerializers():
     zope.component.provideAdapter(insist.TextFieldSerializer)
     zope.component.provideAdapter(insist.IntFieldSerializer)
+    zope.component.provideAdapter(insist.ChoiceFieldSerializer)
 

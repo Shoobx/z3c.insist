@@ -9,6 +9,7 @@ from cStringIO import StringIO
 
 import zope.schema
 import zope.component
+from zope.schema import vocabulary
 
 from z3c.insist import interfaces
 
@@ -149,6 +150,26 @@ class IntFieldSerializer(FieldSerializer):
 
     def deserializeValue(self, value):
         return int(value)
+
+
+@zope.component.adapter(
+    zope.schema.interfaces.IChoice, zope.interface.Interface)
+class ChoiceFieldSerializer(FieldSerializer):
+
+    def _getVocabulary(self):
+        vocab = self.field.vocabulary
+        if vocab is None:
+            reg = vocabulary.getVocabularyRegistry()
+            vocab = reg.get(self.context, self.field.vocabularyName)
+        return vocab
+
+    def serializeValue(self, value):
+        vocabulary = self._getVocabulary()
+        return vocabulary.getTerm(value).token
+
+    def deserializeValue(self, value):
+        vocabulary = self._getVocabulary()
+        return vocabulary.getTermByToken(value).value
 
 
 class CustomSerializer(FieldSerializer):

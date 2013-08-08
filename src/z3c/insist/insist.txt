@@ -91,3 +91,55 @@ The store can have custom methods to load and dump particular fields:
     ... """)
     >>> p.lastname
     'Agejevas'
+
+
+Choice fields
+~~~~~~~~~~~~~
+
+Choice fields are serialized to their token and restored to their
+value.
+
+Let's set up a vocabulary and a schema using it:
+
+    >>> from zope.schema import vocabulary
+    >>> colors = vocabulary.SimpleVocabulary([
+    ...     vocabulary.SimpleTerm("#FF0000", token="red"),
+    ...     vocabulary.SimpleTerm("#00FF00", token="green"),
+    ...     vocabulary.SimpleTerm("#0000FF", token="blue"),
+    ...     ])
+    >>> class IApple(zope.interface.Interface):
+    ...    color = zope.schema.Choice(vocabulary=colors)
+
+    >>> class Apple(object):
+    ...    color = "#00FF00"
+
+    >>> papple = Apple()
+
+    >>> store = insist.ConfigurationStore.makeStore(papple, IApple)
+    >>> print store.dumps()
+    [IApple]
+    color = green
+
+    >>> store.loads("""\
+    ... [IApple]
+    ... color = red
+    ... """)
+    >>> papple.color
+    '#FF0000'
+
+When the value or the term is not in the vocabulary, we get an error:
+
+    >>> papple.color = '#FFFF00'
+    >>> print store.dumps()
+    Traceback (most recent call last):
+      ...
+    LookupError: #FFFF00
+
+    >>> store.loads("""\
+    ... [IApple]
+    ... color = lime
+    ... """)
+    Traceback (most recent call last):
+    ...
+    LookupError: lime
+
