@@ -101,6 +101,7 @@ class CollectionConfigurationStore(ConfigurationStore):
         if config is None:
             config = ConfigParser.SafeConfigParser()
         for k, v in self.context.items():
+            __traceback_info__ = (k, v)
             store = interfaces.IConfigurationStore(v)
             store.section = self.section_prefix + k
             store.root = self.root
@@ -114,10 +115,13 @@ class CollectionConfigurationStore(ConfigurationStore):
         for section in config.sections():
             if not section.startswith(self.section_prefix):
                 continue
-            store = interfaces.IConfigurationStore(self.item_factory())
+            obj = self.item_factory()
+            store = interfaces.IConfigurationStore(obj)
             store.section = section
             store.root = self.root
             store.load(config)
+            name = section[len(self.section_prefix):]
+            self.context[name] = obj
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
