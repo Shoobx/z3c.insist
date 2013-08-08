@@ -185,17 +185,18 @@ class ChoiceFieldSerializer(FieldSerializer):
 
 
 class CustomSerializer(FieldSerializer):
-    """Allow a field-specific method on storage handle the value"""
+    """Allow a field-specific method on storage handle the value.
 
+    Expects that the store will have methods `dump_foo` and `load_foo`
+    that do the value conversion for field `foo`.
+    """
     def __init__(self, field, context, store):
         self.field = field
         self.context = context
         self.store = store
 
-    def serialize(self):
-        value = getattr(self.context, self.field.__name__)
+    def serializeValue(self, value):
         return getattr(self.store, 'dump_' + self.field.__name__)(value)
 
-    def deserialize(self, value):
-        decoded = getattr(self.store, 'load_' + self.field.__name__)(value)
-        setattr(self.context, self.field.__name__, decoded)
+    def deserializeValue(self, value):
+        return getattr(self.store, 'load_' + self.field.__name__)(value)
