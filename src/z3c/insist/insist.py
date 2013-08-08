@@ -184,6 +184,42 @@ class ChoiceFieldSerializer(FieldSerializer):
         return vocabulary.getTermByToken(value).value
 
 
+class SequenceFieldSerializer(FieldSerializer):
+
+    sequence = None
+    separator = ", "
+
+    def serializeValue(self, value):
+        item_serializer =  zope.component.getMultiAdapter(
+            (self.field.value_type, self.context), interfaces.IFieldSerializer)
+        results = []
+        for item in value:
+            results.append(item_serializer.serializeValue(item))
+        return self.separator.join(results)
+
+    def deserializeValue(self, value):
+        item_serializer =  zope.component.getMultiAdapter(
+            (self.field.value_type, self.context), interfaces.IFieldSerializer)
+        results = []
+        if value == '':
+            return self.sequence()
+        for item in value.split(self.separator):
+            __traceback_info__ = item, self.field.value_type
+            item = item.strip()
+            results.append(item_serializer.deserializeValue(item))
+        return self.sequence(results)
+
+
+@zope.component.adapter(zope.schema.interfaces.IList, zope.interface.Interface)
+class ListFieldSerializer(SequenceFieldSerializer):
+    sequence = list
+
+
+@zope.component.adapter(zope.schema.interfaces.ITuple, zope.interface.Interface)
+class TupleFieldSerializer(SequenceFieldSerializer):
+    sequence = tuple
+
+
 class CustomSerializer(FieldSerializer):
     """Allow a field-specific method on storage handle the value.
 

@@ -143,3 +143,36 @@ When the value or the term is not in the vocabulary, we get an error:
     ...
     LookupError: lime
 
+
+Sequence fields
+~~~~~~~~~~~~~~~
+
+Tuple and list fields are serialized as multiline values.
+
+    >>> class ICrayons(zope.interface.Interface):
+    ...     colors = zope.schema.List(
+    ...         value_type=zope.schema.Choice(vocabulary=colors))
+
+    >>> class Crayons(object):
+    ...     colors = None
+
+    >>> cr = Crayons()
+    >>> cr.colors = ['#0000FF', '#00FF00']
+    >>> store = insist.ConfigurationStore.makeStore(cr, ICrayons, 'crayons')
+    >>> print store.dumps()
+    [crayons]
+    colors = blue, green
+
+    >>> store.loads("""\
+    ... [crayons]
+    ... colors = red, green
+    ... """)
+    >>> cr.colors
+    ['#FF0000', '#00FF00']
+
+    >>> store.loads("""\
+    ... [crayons]
+    ... colors =
+    ... """)
+    >>> cr.colors
+    []

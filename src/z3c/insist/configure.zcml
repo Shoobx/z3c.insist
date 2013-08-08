@@ -3,4 +3,6 @@
   <adapter factory=".insist.TextFieldSerializer" />
   <adapter factory=".insist.IntFieldSerializer" />
   <adapter factory=".insist.ChoiceFieldSerializer" />
+  <adapter factory=".insist.ListFieldSerializer" />
+  <adapter factory=".insist.TupleFieldSerializer" />
 </configure>
