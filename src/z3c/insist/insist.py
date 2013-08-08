@@ -17,6 +17,7 @@ from z3c.insist import interfaces
 class ConfigurationStore(object):
 
     section = 'object'
+    fields = None
 
     def __init__(self, context):
         self.context = context
@@ -34,6 +35,8 @@ class ConfigurationStore(object):
             config = ConfigParser.SafeConfigParser()
         config.add_section(self.section)
         for fn, field in zope.schema.getFieldsInOrder(self.schema):
+            if self.fields is not None and fn not in self.fields:
+                continue
             __traceback_info__ = (self.section, self.schema, fn)
             if hasattr(self, 'dump_%s' % fn):
                 serializer = CustomSerializer(field, self.context, self)
@@ -52,6 +55,8 @@ class ConfigurationStore(object):
 
     def load(self, config):
         for fn, field in zope.schema.getFieldsInOrder(self.schema):
+            if self.fields is not None and fn not in self.fields:
+                continue
             __traceback_info__ = (self.section, self.schema, fn)
             if hasattr(self, 'load_%s' % fn):
                 serializer = CustomSerializer(field, self.context, self)

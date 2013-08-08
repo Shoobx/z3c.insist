@@ -44,3 +44,21 @@ Similarly, the store can load the object state from a config file:
      'lastname': u'Agejevas',
      'weight': 42,
      'yacht': None}
+
+The store can provide an attribute with a list of fields to process:
+
+    >>> store.fields = ('firstname', 'lastname')
+    >>> print store.dumps()
+    [person]
+    firstname = Albertas
+    lastname = Agejevas
+
+It works for loading, too:
+
+    >>> store.loads("""\
+    ... [person]
+    ... firstname = Albertas
+    ... lastname = Agejevas
+    ... yacht = Titanic
+    ... """)
+    >>> p.yacht
