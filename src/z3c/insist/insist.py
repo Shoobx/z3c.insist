@@ -96,24 +96,25 @@ class CollectionConfigurationStore(ConfigurationStore):
     """
 
     def dump(self, config=None):
-        config = super(CollectionConfigurationStore, self).dump(config)
+        if config is None:
+            config = ConfigParser.SafeConfigParser()
         for k, v in self.context.items():
             store = interfaces.IConfigurationStore(v)
             store.section = self.section_prefix + k
+            store.root = self.root
             store.dump(config)
         return config
 
     def load(self, config):
-        super(CollectionConfigurationStore, self).load(config)
-
         for k in list(self.context):
             del self.context[k]
 
-        for section in config.sections:
+        for section in config.sections():
             if not section.startswith(self.section_prefix):
                 continue
             store = interfaces.IConfigurationStore(self.item_factory())
             store.section = section
+            store.root = self.root
             store.load(config)
         return config
 
