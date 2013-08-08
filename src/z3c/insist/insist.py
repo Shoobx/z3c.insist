@@ -145,13 +145,19 @@ class FieldSerializer(object):
 
 
 @zope.component.adapter(
-    zope.schema.interfaces.ITextLine, zope.interface.Interface)
+    zope.schema.interfaces.IText, zope.interface.Interface)
 class TextFieldSerializer(FieldSerializer):
     def serializeValue(self, value):
         return value.encode('utf-8')
 
     def deserializeValue(self, value):
         return unicode(value, 'utf-8')
+
+
+@zope.component.adapter(
+    zope.schema.interfaces.ITextLine, zope.interface.Interface)
+class TextLineFieldSerializer(TextFieldSerializer):
+    pass
 
 
 @zope.component.adapter(
@@ -162,6 +168,16 @@ class IntFieldSerializer(FieldSerializer):
 
     def deserializeValue(self, value):
         return int(value)
+
+
+@zope.component.adapter(
+    zope.schema.interfaces.IBool, zope.interface.Interface)
+class BoolFieldSerializer(FieldSerializer):
+    def serializeValue(self, value):
+        return str(value)
+
+    def deserializeValue(self, value):
+        return value == 'True'
 
 
 @zope.component.adapter(
