@@ -116,7 +116,6 @@ class CollectionConfigurationStore(ConfigurationStore):
             store.section = section
             store.root = self.root
             store.load(config)
-        return config
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
