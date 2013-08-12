@@ -43,11 +43,15 @@ class ConfigurationStore(object):
             store.section = section
         return store
 
-    def dump(self, config=None):
-        if config is None:
-            config = ConfigParser.SafeConfigParser()
-        config.add_section(self.section)
-        for fn, field in zope.schema.getFieldsInOrder(self.schema):
+    def _get_fields(self):
+        """Returns a sequence of (name, field) pairs"""
+        return zope.schema.getFieldsInOrder(self.schema)
+
+    def _dump(self, config, add_section=True):
+        """Hook for extending"""
+        if add_section:
+            config.add_section(self.section)
+        for fn, field in self._get_fields():
             if self.fields is not None and fn not in self.fields:
                 continue
             __traceback_info__ = (self.section, self.schema, fn)
@@ -58,6 +62,11 @@ class ConfigurationStore(object):
                     (field, self.context), interfaces.IFieldSerializer)
             state = serializer.serialize()
             config.set(self.section, fn, state)
+
+    def dump(self, config=None):
+        if config is None:
+            config = ConfigParser.SafeConfigParser()
+        self._dump(config)
         return config
 
     def dumps(self):
@@ -67,7 +76,7 @@ class ConfigurationStore(object):
         return buf.getvalue()
 
     def load(self, config):
-        for fn, field in zope.schema.getFieldsInOrder(self.schema):
+        for fn, field in self._get_fields():
             if self.fields is not None and fn not in self.fields:
                 continue
             if not config.has_option(self.section, fn):
