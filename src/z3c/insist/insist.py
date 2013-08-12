@@ -66,6 +66,7 @@ class ConfigurationStore(object):
     def dump(self, config=None):
         if config is None:
             config = ConfigParser.SafeConfigParser()
+            config.optionxform = str
         self._dump(config)
         return config
 
