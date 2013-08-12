@@ -89,6 +89,9 @@ class ConfigurationStore(object):
                 serializer = zope.component.getMultiAdapter(
                     (field, self.context), interfaces.IFieldSerializer)
             serializer.deserialize(config.get(self.section, fn))
+        zope.event.notify(
+            interfaces.ObjectConfigurationLoadedEvent(
+                self.context))
 
     def loads(self, cfgstr):
         buf = StringIO(cfgstr)
