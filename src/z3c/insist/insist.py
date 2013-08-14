@@ -110,6 +110,9 @@ class CollectionConfigurationStore(ConfigurationStore):
        * item_factory
     """
 
+    def addItem(self, name, obj):
+        self.context[name] = obj
+
     def dump(self, config=None):
         if config is None:
             config = ConfigParser.SafeConfigParser()
@@ -134,7 +137,9 @@ class CollectionConfigurationStore(ConfigurationStore):
             store.root = self.root
             store.load(config)
             name = section[len(self.section_prefix):]
-            self.context[name] = obj
+            self.addItem(name, obj)
+            if hasattr(store, 'loadAfterAdd'):
+                store.loadAfterAdd(config)
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
@@ -212,11 +217,23 @@ class ChoiceFieldSerializer(FieldSerializer):
 
     def serializeValue(self, value):
         vocabulary = self._getVocabulary()
-        return vocabulary.getTerm(value).token
+        try:
+            return vocabulary.getTerm(value).token
+        except LookupError, err:
+            # The term does not exist any more. Since in most cases the for
+            # user-defined vocabularies the value == token, we'll just return
+            # the str'ed value.
+            return str(value)
 
     def deserializeValue(self, value):
         vocabulary = self._getVocabulary()
-        return vocabulary.getTermByToken(value).value
+        try:
+            return vocabulary.getTermByToken(value).value
+        except LookupError, err:
+            # The term does not exist any more. Since in most cases the for
+            # user-defined vocabularies the value == token, we'll just return
+            # the str'ed value.
+            return unicode(value)
 
 
 class SequenceFieldSerializer(FieldSerializer):
