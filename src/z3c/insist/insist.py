@@ -19,6 +19,7 @@ class ConfigurationStore(object):
 
     _section = None
     fields = None
+    ignore_fields = None
     root = None
 
     def __init__(self, context):
@@ -53,6 +54,8 @@ class ConfigurationStore(object):
             config.add_section(self.section)
         for fn, field in self._get_fields():
             if self.fields is not None and fn not in self.fields:
+                continue
+            if self.ignore_fields is not None and fn in self.ignore_fields:
                 continue
             __traceback_info__ = (self.section, self.schema, fn)
             if hasattr(self, 'dump_%s' % fn):
