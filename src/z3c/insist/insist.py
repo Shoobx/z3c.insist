@@ -140,6 +140,8 @@ class CollectionConfigurationStore(ConfigurationStore):
             store.root = self.root
             store.load(config)
             name = section[len(self.section_prefix):]
+            if hasattr(store, 'loadBeforeAdd'):
+                obj = store.loadBeforeAdd(name, config)
             self.addItem(name, obj)
             if hasattr(store, 'loadAfterAdd'):
                 store.loadAfterAdd(config)
