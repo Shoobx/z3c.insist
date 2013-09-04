@@ -68,7 +68,7 @@ class ConfigurationStore(object):
 
     def dump(self, config=None):
         if config is None:
-            config = ConfigParser.SafeConfigParser()
+            config = ConfigParser.RawConfigParser()
             config.optionxform = str
         self._dump(config)
         return config
@@ -98,7 +98,7 @@ class ConfigurationStore(object):
 
     def loads(self, cfgstr):
         buf = StringIO(cfgstr)
-        config = ConfigParser.SafeConfigParser()
+        config = ConfigParser.RawConfigParser()
         config.readfp(buf)
         self.load(config)
 
@@ -118,7 +118,7 @@ class CollectionConfigurationStore(ConfigurationStore):
 
     def dump(self, config=None):
         if config is None:
-            config = ConfigParser.SafeConfigParser()
+            config = ConfigParser.RawConfigParser()
         for k, v in self.context.items():
             __traceback_info__ = (k, v)
             store = interfaces.IConfigurationStore(v)
