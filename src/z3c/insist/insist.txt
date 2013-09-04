@@ -127,21 +127,20 @@ Let's set up a vocabulary and a schema using it:
     >>> papple.color
     '#FF0000'
 
-When the value or the term is not in the vocabulary, we get an error:
+When the value or the term is not in the vocabulary, the value converted to a
+string is used as the token:
 
     >>> papple.color = '#FFFF00'
     >>> print store.dumps()
-    Traceback (most recent call last):
-      ...
-    LookupError: #FFFF00
+    [IApple]
+    color = #FFFF00
 
     >>> store.loads("""\
     ... [IApple]
     ... color = lime
     ... """)
-    Traceback (most recent call last):
-    ...
-    LookupError: lime
+    >>> papple.color
+    u'lime'
 
 
 Sequence fields
