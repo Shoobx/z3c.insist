@@ -44,7 +44,7 @@ setup(
               'junitxml',
               ],),
     install_requires=[
-	'distribute',
+	'setuptools',
         'zope.schema',
         'zope.component',
         'zope.lifecycleevent',
