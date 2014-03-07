@@ -200,6 +200,16 @@ class IntFieldSerializer(FieldSerializer):
 
 
 @zope.component.adapter(
+    zope.schema.interfaces.IFloat, zope.interface.Interface)
+class FloatFieldSerializer(FieldSerializer):
+    def serializeValue(self, value):
+        return str(value)
+
+    def deserializeValue(self, value):
+        return float(value)
+
+
+@zope.component.adapter(
     zope.schema.interfaces.IBool, zope.interface.Interface)
 class BoolFieldSerializer(FieldSerializer):
     def serializeValue(self, value):
