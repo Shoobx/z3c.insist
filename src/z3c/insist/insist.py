@@ -234,7 +234,7 @@ class ChoiceFieldSerializer(FieldSerializer):
         vocabulary = self._getVocabulary()
         try:
             return vocabulary.getTerm(value).token
-        except LookupError, err:
+        except LookupError:
             # The term does not exist any more. Since in most cases the for
             # user-defined vocabularies the value == token, we'll just return
             # the str'ed value.
@@ -244,7 +244,7 @@ class ChoiceFieldSerializer(FieldSerializer):
         vocabulary = self._getVocabulary()
         try:
             return vocabulary.getTermByToken(value).value
-        except LookupError, err:
+        except LookupError:
             # The term does not exist any more. Since in most cases the for
             # user-defined vocabularies the value == token, we'll just return
             # the str'ed value.
@@ -257,7 +257,7 @@ class SequenceFieldSerializer(FieldSerializer):
     separator = ", "
 
     def serializeValue(self, value):
-        item_serializer =  zope.component.getMultiAdapter(
+        item_serializer = zope.component.getMultiAdapter(
             (self.field.value_type, self.context), interfaces.IFieldSerializer)
         results = []
         for item in value:
@@ -265,7 +265,7 @@ class SequenceFieldSerializer(FieldSerializer):
         return self.separator.join(results)
 
     def deserializeValue(self, value):
-        item_serializer =  zope.component.getMultiAdapter(
+        item_serializer = zope.component.getMultiAdapter(
             (self.field.value_type, self.context), interfaces.IFieldSerializer)
         results = []
         if value == '':
