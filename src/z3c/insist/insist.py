@@ -4,6 +4,7 @@
 #
 ###############################################################################
 """z3c.insist -- Persistence to ini files"""
+import datetime
 import ConfigParser
 from cStringIO import StringIO
 
@@ -217,6 +218,30 @@ class BoolFieldSerializer(FieldSerializer):
 
     def deserializeValue(self, value):
         return value == 'True'
+
+
+@zope.component.adapter(
+    zope.schema.interfaces.IDate, zope.interface.Interface)
+class DateFieldSerializer(FieldSerializer):
+    format = '%Y-%m-%d'
+
+    def serializeValue(self, value):
+        return value.strftime(self.format)
+
+    def deserializeValue(self, value):
+        return datetime.datetime.strptime(value, self.format).date()
+
+
+@zope.component.adapter(
+    zope.schema.interfaces.IDatetime, zope.interface.Interface)
+class DateTimeFieldSerializer(FieldSerializer):
+    format = '%Y-%m-%dT%H:%M:%S %f %Z'
+
+    def serializeValue(self, value):
+        return value.strftime(self.format)
+
+    def deserializeValue(self, value):
+        return datetime.datetime.strptime(value, self.format)
 
 
 @zope.component.adapter(

@@ -8,4 +8,6 @@
   <adapter factory=".insist.ListFieldSerializer" />
   <adapter factory=".insist.TupleFieldSerializer" />
   <adapter factory=".insist.BoolFieldSerializer" />
+  <adapter factory=".insist.DateFieldSerializer" />
+  <adapter factory=".insist.DateTimeFieldSerializer" />
 </configure>

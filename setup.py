@@ -12,7 +12,7 @@ def read_file(filename):
 
 setup(
     name="z3c.insist",
-    version='0.1.0dev',
+    version='0.1.0dev1',
     author="Shoobx, Inc.",
     author_email="dev@shoobx.com",
     description="Persistence to ini files",
