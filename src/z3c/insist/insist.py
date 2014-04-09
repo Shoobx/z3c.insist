@@ -87,7 +87,9 @@ class ConfigurationStore(object):
                 continue
             # XXX: __name__ is a special for RawConfigParser
             #      http://bugs.python.org/msg215809
-            if fn not in config.options(self.section):
+            if not config.has_section(self.section):
+                continue
+            elif fn not in config.options(self.section):
                 continue
             #if not config.has_option(self.section, fn):
             #    continue
