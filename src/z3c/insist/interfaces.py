@@ -36,7 +36,7 @@ class IConfigurationStore(zope.interface.Interface):
         Returns a string.
         """
 
-    def load(config):
+    def loads(config):
         """Load the object state from the configuration as a string."""
 
 
