@@ -42,11 +42,13 @@ setup(
               'coverage',
               'python-subunit',
               'junitxml',
+              'pytz',
               ],),
     install_requires=[
         'setuptools',
         'zope.schema',
         'zope.component',
         'zope.lifecycleevent',
+        'python-dateutil',
     ]
 )

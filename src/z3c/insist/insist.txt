@@ -22,7 +22,7 @@ Suppose we have an object with some schema:
     ...     yacht = zope.schema.TextLine(title=u"Yacht Name")
 
 Now we can create a store that will dump and restore the state of an
-object in an *.ini file:
+object in an .ini file:
 
     >>> from z3c.insist import insist
     >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
@@ -175,3 +175,86 @@ Tuple and list fields are serialized as multiline values.
     ... """)
     >>> cr.colors
     []
+
+Date fields
+~~~~~~~~~~~
+
+Date fields get stringified.
+
+    >>> class IPerson(zope.interface.Interface):
+    ...     birthdate = zope.schema.Date()
+
+    >>> class Person(object):
+    ...     birthdate = None
+
+    >>> import datetime
+    >>> p = Person()
+    >>> p.birthdate = datetime.date(1974, 12, 30)
+
+    >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+    >>> print store.dumps()
+    [person]
+    birthdate = 1974-12-30
+
+    >>> store.loads("""\
+    ... [person]
+    ... birthdate = 2014-01-31
+    ... """)
+    >>> p.birthdate
+    datetime.date(2014, 1, 31)
+
+
+Datetime fields
+~~~~~~~~~~~~~~~
+
+Datetime fields get stringified.
+
+    >>> class IFoo(zope.interface.Interface):
+    ...     timestamp = zope.schema.Datetime()
+
+    >>> class Foo(object):
+    ...     timestamp = None
+
+    >>> foo = Foo()
+    >>> foo.timestamp = datetime.datetime(2014, 4, 9, 9, 54, 42, 132)
+
+    >>> store = insist.ConfigurationStore.makeStore(foo, IFoo, 'foo')
+    >>> print store.dumps()
+    [foo]
+    timestamp = 2014-04-09T09:54:42.000132
+
+  We need to take care about timezones too.
+
+    >>> from pytz import UTC, timezone
+
+    >>> foo.timestamp = datetime.datetime(2014, 4, 9, 9, 54, 42, 132, tzinfo=UTC)
+    >>> print store.dumps()
+    [foo]
+    timestamp = 2014-04-09T09:54:42.000132 UTC
+
+    >>> foo.timestamp = datetime.datetime(2014, 4, 9, 9, 54, 42, 132,
+    ...     tzinfo=timezone('CET'))
+    >>> print store.dumps()
+    [foo]
+    timestamp = 2014-04-09T09:54:42.000132 CET
+
+    >>> store.loads("""\
+    ... [foo]
+    ... timestamp = 2014-04-09T09:54:42.000132
+    ... """)
+    >>> foo.timestamp
+    datetime.datetime(2014, 4, 9, 9, 54, 42, 132)
+
+    >>> store.loads("""\
+    ... [foo]
+    ... timestamp = 2014-04-09T09:54:42.000132 UTC
+    ... """)
+    >>> foo.timestamp
+    datetime.datetime(2014, 4, 9, 9, 54, 42, 132, tzinfo=tzutc())
+
+    >>> store.loads("""\
+    ... [foo]
+    ... timestamp = 2014-04-09T09:54:42.000132 CET
+    ... """)
+    >>> foo.timestamp
+    datetime.datetime(2014, 4, 9, 9, 54, 42, 132, tzinfo=tzlocal())

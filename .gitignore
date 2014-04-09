@@ -3,7 +3,6 @@ develop-eggs/
 ve/
 parts/
 .installed.cfg
-bootstrap.py
 
 *.pyc
 src/*.egg-info
