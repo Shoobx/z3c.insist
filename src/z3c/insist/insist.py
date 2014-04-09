@@ -113,6 +113,10 @@ class CollectionConfigurationStore(ConfigurationStore):
        * schema
        * section_prefix
        * item_factory
+
+    Optionally:
+
+       * item_factory_typed(config, section)
     """
 
     def addItem(self, name, obj):
@@ -136,7 +140,10 @@ class CollectionConfigurationStore(ConfigurationStore):
         for section in config.sections():
             if not section.startswith(self.section_prefix):
                 continue
-            obj = self.item_factory()
+            if hasattr(self, 'item_factory_typed'):
+                obj = self.item_factory_typed(config, section)
+            else:
+                obj = self.item_factory()
             store = interfaces.IConfigurationStore(obj)
             store.section = section
             store.root = self.root
