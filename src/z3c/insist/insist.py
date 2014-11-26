@@ -134,7 +134,7 @@ class CollectionConfigurationStore(ConfigurationStore):
         for k, v in self.context.items():
             __traceback_info__ = (k, v)
             store = interfaces.IConfigurationStore(v)
-            store.section = self.section_prefix + k
+            store.section = self.section_prefix + unicode(k).encode('utf-8')
             store.root = self.root
             store.dump(config)
         return config
