@@ -189,6 +189,16 @@ class FieldSerializer(object):
 
 
 @zope.component.adapter(
+    zope.schema.interfaces.IBytes, zope.interface.Interface)
+class BytesFieldSerializer(FieldSerializer):
+    def serializeValue(self, value):
+        return value
+
+    def deserializeValue(self, value):
+        return value
+
+
+@zope.component.adapter(
     zope.schema.interfaces.IText, zope.interface.Interface)
 class TextFieldSerializer(FieldSerializer):
     def serializeValue(self, value):

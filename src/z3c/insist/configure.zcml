@@ -1,5 +1,6 @@
 <configure
     xmlns="http://namespaces.zope.org/zope">
+  <adapter factory=".insist.BytesFieldSerializer" />
   <adapter factory=".insist.TextFieldSerializer" />
   <adapter factory=".insist.TextLineFieldSerializer" />
   <adapter factory=".insist.IntFieldSerializer" />
