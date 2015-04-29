@@ -143,6 +143,35 @@ string is used as the token:
     u'lime'
 
 
+Decimal fields
+~~~~~~~~~~~~~~
+
+Decimal fields are serialized to/from strings pretty trivially
+
+    >>> import decimal
+
+    >>> class IProduct(zope.interface.Interface):
+    ...    price = zope.schema.Decimal()
+
+    >>> class Product(object):
+    ...    price = decimal.Decimal('23.06')
+    >>> product = Product
+    >>> store = insist.ConfigurationStore.makeStore(product, IProduct)
+    >>> ini = store.dumps()
+    >>> print ini
+    [IProduct]
+    price = 23.06
+
+Now load the configuration
+
+    >>> loaded = store.loads("""
+    ... [IProduct]
+    ... price = 0.05
+    ... """)
+    >>> product.price
+    Decimal('0.05')
+
+
 Sequence fields
 ~~~~~~~~~~~~~~~
 
@@ -257,4 +286,4 @@ Datetime fields get stringified.
     ... timestamp = 2014-04-09T09:54:42.000132 CET
     ... """)
     >>> foo.timestamp
-    datetime.datetime(2014, 4, 9, 9, 54, 42, 132, tzinfo=tzlocal())
+    datetime.datetime(2014, 4, 9, 9, 54, 42, 132)

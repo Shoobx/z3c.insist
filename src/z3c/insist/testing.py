@@ -16,6 +16,7 @@ def setUpSerializers():
     zope.component.provideAdapter(insist.TextFieldSerializer)
     zope.component.provideAdapter(insist.TextLineFieldSerializer)
     zope.component.provideAdapter(insist.IntFieldSerializer)
+    zope.component.provideAdapter(insist.DecimalFieldSerializer)
     zope.component.provideAdapter(insist.ChoiceFieldSerializer)
     zope.component.provideAdapter(insist.ListFieldSerializer)
     zope.component.provideAdapter(insist.TupleFieldSerializer)

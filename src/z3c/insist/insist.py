@@ -5,6 +5,7 @@
 ###############################################################################
 """z3c.insist -- Persistence to ini files"""
 import datetime
+import decimal
 import ConfigParser
 from cStringIO import StringIO
 
@@ -232,6 +233,16 @@ class FloatFieldSerializer(FieldSerializer):
 
     def deserializeValue(self, value):
         return float(value)
+
+
+@zope.component.adapter(
+    zope.schema.interfaces.IDecimal, zope.interface.Interface)
+class DecimalFieldSerializer(FieldSerializer):
+    def serializeValue(self, value):
+        return str(value)
+
+    def deserializeValue(self, value):
+        return decimal.Decimal(value)
 
 
 @zope.component.adapter(
