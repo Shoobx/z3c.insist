@@ -3,6 +3,7 @@ develop-eggs/
 ve/
 parts/
 .installed.cfg
+build/
 
 *.pyc
 src/*.egg-info
