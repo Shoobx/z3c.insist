@@ -45,6 +45,9 @@ class IFieldSerializer(zope.interface.Interface):
 
     An adapter that takes a field and a value.
     """
+    def hasValue():
+        """Return True if the value is not empty/missing."""
+
     def serialize():
         """Return a string representation of the field"""
 

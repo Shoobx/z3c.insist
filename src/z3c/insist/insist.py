@@ -23,6 +23,7 @@ class ConfigurationStore(object):
     _section = None
     fields = None
     ignore_fields = None
+    ignore_missing = False
     root = None
 
     def __init__(self, context):
@@ -66,6 +67,8 @@ class ConfigurationStore(object):
             else:
                 serializer = zope.component.getMultiAdapter(
                     (field, self.context), interfaces.IFieldSerializer)
+            if self.ignore_missing and not serializer.hasValue():
+                continue
             state = serializer.serialize()
             config.set(self.section, fn, state)
 
@@ -171,6 +174,10 @@ class FieldSerializer(object):
     def __init__(self, field, context):
         self.field = field
         self.context = context
+
+    def hasValue(self):
+        value = getattr(self.context, self.field.__name__)
+        return value is not self.field.missing_value
 
     def serialize(self):
         value = getattr(self.context, self.field.__name__)
