@@ -97,6 +97,9 @@ class ConfigurationStore(object):
                 continue
             #if not config.has_option(self.section, fn):
             #    continue
+            if fn=='default' and 'List' in repr(self):
+                from dbgp.client import brk; brk('127.0.0.1')
+
             __traceback_info__ = (self.section, self.schema, fn)
             if hasattr(self, 'load_%s' % fn):
                 serializer = CustomSerializer(field, self.context, self)
@@ -337,11 +340,11 @@ class SequenceFieldSerializer(FieldSerializer):
         return self.separator.join(results)
 
     def deserializeValue(self, value):
+        if value == '':
+            return self.sequence()
         item_serializer = zope.component.getMultiAdapter(
             (self.field.value_type, self.context), interfaces.IFieldSerializer)
         results = []
-        if value == '':
-            return self.sequence()
         for item in value.split(self.separator):
             __traceback_info__ = item, self.field.value_type
             item = item.strip()
