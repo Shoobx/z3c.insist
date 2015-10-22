@@ -49,6 +49,6 @@ setup(
         'zope.schema',
         'zope.component',
         'zope.lifecycleevent',
-        'python-dateutil',
+        'iso8601',
     ]
 )

@@ -259,34 +259,20 @@ Datetime fields get stringified.
     >>> foo.timestamp = datetime.datetime(2014, 4, 9, 9, 54, 42, 132, tzinfo=UTC)
     >>> print store.dumps()
     [foo]
-    timestamp = 2014-04-09T09:54:42.000132 UTC
+    timestamp = 2014-04-09T09:54:42.000132+00:00
 
     >>> foo.timestamp = datetime.datetime(2014, 4, 9, 9, 54, 42, 132,
     ...     tzinfo=timezone('CET'))
     >>> print store.dumps()
     [foo]
-    timestamp = 2014-04-09T09:54:42.000132 CET
+    timestamp = 2014-04-09T09:54:42.000132+01:00
 
     >>> store.loads("""\
     ... [foo]
     ... timestamp = 2014-04-09T09:54:42.000132
     ... """)
-    >>> foo.timestamp
-    datetime.datetime(2014, 4, 9, 9, 54, 42, 132)
-
-    >>> store.loads("""\
-    ... [foo]
-    ... timestamp = 2014-04-09T09:54:42.000132 UTC
-    ... """)
     >>> foo.timestamp.isoformat()
     '2014-04-09T09:54:42.000132+00:00'
-
-    >>> store.loads("""\
-    ... [foo]
-    ... timestamp = 2014-04-09T09:54:42.000132 CET
-    ... """)
-    >>> foo.timestamp.isoformat()
-    '2014-04-09T09:54:42.000132+02:00'
 
     >>> store.loads("""\
     ... [foo]
@@ -297,7 +283,7 @@ Datetime fields get stringified.
 
     >>> store.loads("""\
     ... [foo]
-    ... timestamp = 2014-04-09T09:54:42.000132+02:00
+    ... timestamp = 2014-04-09T09:54:42.000132+01:00
     ... """)
     >>> foo.timestamp.isoformat()
-    '2014-04-09T09:54:42.000132+02:00'
+    '2014-04-09T09:54:42.000132+01:00'

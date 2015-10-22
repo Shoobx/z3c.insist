@@ -9,7 +9,7 @@ import decimal
 import ConfigParser
 from cStringIO import StringIO
 
-import dateutil.parser
+import iso8601
 import zope.schema
 import zope.component
 from zope.schema import vocabulary
@@ -277,18 +277,20 @@ class DateFieldSerializer(FieldSerializer):
 @zope.component.adapter(
     zope.schema.interfaces.IDatetime, zope.interface.Interface)
 class DateTimeFieldSerializer(FieldSerializer):
-    format = '%Y-%m-%dT%H:%M:%S.%f %Z'
-    notzFormat = '%Y-%m-%dT%H:%M:%S.%f'
+    # format = '%Y-%m-%dT%H:%M:%S.%f+%z'
+    # notzFormat = '%Y-%m-%dT%H:%M:%S.%f'
 
     def serializeValue(self, value):
-        return value.strftime('%Y-%m-%dT%H:%M:%S.%f %Z')
+        return value.isoformat()
 
     def deserializeValue(self, value):
         # the pain here is that datetimes without a TZ burp with
         # ValueError: time data '2014-01-01T00:00:00.000000'
         #   does not match format '%Y-%m-%dT%H:%M:%S.%f %Z'
-        # and strptime isn't tops with timezones
-        return dateutil.parser.parse(value)
+        # and strptime isn't tops with timezones (does not support %z)
+        #return dateutil.parser.parse(value)
+        
+        return iso8601.parse_date(value)
 
 
 @zope.component.adapter(
