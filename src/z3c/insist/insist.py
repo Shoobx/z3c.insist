@@ -97,9 +97,6 @@ class ConfigurationStore(object):
                 continue
             #if not config.has_option(self.section, fn):
             #    continue
-            if fn=='default' and 'List' in repr(self):
-                from dbgp.client import brk; brk('127.0.0.1')
-
             __traceback_info__ = (self.section, self.schema, fn)
             if hasattr(self, 'load_%s' % fn):
                 serializer = CustomSerializer(field, self.context, self)
