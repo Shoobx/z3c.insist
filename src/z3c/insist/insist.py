@@ -129,6 +129,17 @@ class CollectionConfigurationStore(ConfigurationStore):
        * item_factory_typed(config, section)
     """
 
+    def selectSections(self, sections):
+        """Return relevant sections from config
+        """
+        return (sec for sec in sections
+                if sec.startswith(self.section_prefix))
+
+    def getItemName(self, config, section):
+        """Return a unique name for item, represented by this section
+        """
+        return section[len(self.section_prefix):]
+
     def addItem(self, name, obj):
         self.context[name] = obj
 
@@ -147,23 +158,24 @@ class CollectionConfigurationStore(ConfigurationStore):
         for k in list(self.context):
             del self.context[k]
 
-        for section in config.sections():
-            if not section.startswith(self.section_prefix):
-                continue
-            if hasattr(self, 'item_factory_typed'):
-                obj = self.item_factory_typed(config, section)
-            else:
-                obj = self.item_factory()
-            store = interfaces.IConfigurationStore(obj)
-            store.section = section
-            store.root = self.root
-            store.load(config)
-            name = section[len(self.section_prefix):]
-            if hasattr(store, 'loadBeforeAdd'):
-                obj = store.loadBeforeAdd(name, config)
-            self.addItem(name, obj)
-            if hasattr(store, 'loadAfterAdd'):
-                store.loadAfterAdd(config)
+        for section in self.selectSections(config.sections()):
+            self.loadFromSection(config, section)
+
+    def loadFromSection(self, config, section):
+        if hasattr(self, 'item_factory_typed'):
+            obj = self.item_factory_typed(config, section)
+        else:
+            obj = self.item_factory()
+        store = interfaces.IConfigurationStore(obj)
+        store.section = section
+        store.root = self.root
+        store.load(config)
+        name = self.getItemName(config, section)
+        if hasattr(store, 'loadBeforeAdd'):
+            obj = store.loadBeforeAdd(name, config)
+        self.addItem(name, obj)
+        if hasattr(store, 'loadAfterAdd'):
+            store.loadAfterAdd(config)
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
