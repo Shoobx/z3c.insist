@@ -155,27 +155,65 @@ class CollectionConfigurationStore(ConfigurationStore):
         return config
 
     def load(self, config):
-        for k in list(self.context):
+        unloaded = set(self.context.keys())
+        for section in self.selectSections(config.sections()):
+            loaded = self.loadFromSection(config, section)
+            if loaded in unloaded:
+                unloaded.remove(loaded)
+
+        # Remove any unloaded items from collection
+        for k in unloaded:
             del self.context[k]
 
-        for section in self.selectSections(config.sections()):
-            self.loadFromSection(config, section)
+    def getSectionHash(self, obj, config, section):
+        return hash(tuple(config.items(section)))
 
     def loadFromSection(self, config, section):
-        if hasattr(self, 'item_factory_typed'):
-            obj = self.item_factory_typed(config, section)
+        """Load object from section and return name of the loaded object
+
+        After this function is completed, object with returned name should
+        exist in a collection and objects data should be up to date with
+        configuration.
+        """
+        name = self.getItemName(config, section)
+
+        existing = name in self.context
+
+        # Obtain the object we are loading. Find in collection or create new
+        # one.
+        if existing:
+            obj = self.context[name]
         else:
-            obj = self.item_factory()
+            if hasattr(self, 'item_factory_typed'):
+                obj = self.item_factory_typed(config, section)
+            else:
+                obj = self.item_factory()
+
+        # Find the store object, that will handle loading
         store = interfaces.IConfigurationStore(obj)
         store.section = section
         store.root = self.root
+        confhash = self.getSectionHash(obj, config, section)
+
+        # Check if configuration has changed
+        if getattr(obj, "__insist_hash__", None) == confhash:
+            # Item did not change, skip it
+            return name
+
+        # Config has changed, we can load object with properties from
+        # configuration.
         store.load(config)
-        name = self.getItemName(config, section)
-        if hasattr(store, 'loadBeforeAdd'):
-            obj = store.loadBeforeAdd(name, config)
-        self.addItem(name, obj)
-        if hasattr(store, 'loadAfterAdd'):
-            store.loadAfterAdd(config)
+        obj.__insist_hash__ = confhash
+
+        if not existing:
+            # Let everyone know the object is being added to a collection
+            if hasattr(store, 'loadBeforeAdd'):
+                obj = store.loadBeforeAdd(name, config)
+            self.addItem(name, obj)
+            if hasattr(store, 'loadAfterAdd'):
+                store.loadAfterAdd(config)
+
+        return name
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
