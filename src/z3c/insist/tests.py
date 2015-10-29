@@ -4,11 +4,13 @@ Test fixture.
 """
 import doctest
 import unittest
+import textwrap
 
+import zope.interface
 import zope.component
 import zope.component.testing
 
-from z3c.insist import insist, testing
+from z3c.insist import insist, testing, interfaces
 
 
 class INoneTestSchema(zope.interface.Interface):
@@ -18,12 +20,41 @@ class INoneTestSchema(zope.interface.Interface):
     test4 = zope.schema.Int()
 
 
+@zope.interface.implementer(INoneTestSchema)
 class NoneTestObject(object):
     def __init__(self):
         self.test1 = '!None'
         self.test2 = None
         self.test3 = u"To infinity! And beyond!"
         self.test4 = None
+
+
+class IPerson(zope.interface.Interface):
+    firstname = zope.schema.TextLine()
+    lastname = zope.schema.TextLine()
+    salary = zope.schema.Int()
+    male = zope.schema.Bool()
+
+
+@zope.interface.implementer(IPerson)
+class Person(object):
+    def __init__(self, firstname=None, lastname=None, salary=None, male=None):
+        self.firstname = firstname
+        self.lastname = lastname
+        self.salary = salary
+        self.male = male
+
+    def  __repr__(self):
+        return "<Person %s %s, %s, salary: %s>" % \
+            (self.firstname, self.lastname,
+             "male" if self.male else "female",
+             self.salary)
+
+
+class PersonCollectionStore(insist.CollectionConfigurationStore):
+    schema = IPerson
+    section_prefix = 'person:'
+    item_factory = Person
 
 
 def doctest_FieldSerializer_None():
@@ -92,6 +123,154 @@ def doctest_ConfigurationStore_section():
        'specific'
 
     """
+
+def doctest_CollectionConfigStore_dump():
+    """
+        Collections can be stored semi-automatically
+
+        >>> coll = {
+        ...     'jeb': Person("Jebediah", "Kerman", 20000, True),
+        ...     'val': Person("Valentina", "Kerman", 30000, False),
+        ... }
+        >>> itemstore = lambda ctx: insist.ConfigurationStore.makeStore(
+        ...     ctx, IPerson, 'test')
+        >>> gsm = zope.component.getGlobalSiteManager()
+        >>> gsm.registerAdapter(itemstore, (IPerson, ), interfaces.IConfigurationStore, '')
+
+        >>> store = PersonCollectionStore(coll)
+        >>> print store.dumps()
+        [person:jeb]
+        firstname = Jebediah
+        lastname = Kerman
+        salary = 20000
+        male = True
+        <BLANKLINE>
+        [person:val]
+        firstname = Valentina
+        lastname = Kerman
+        salary = 30000
+        male = False
+    """
+
+def doctest_CollectionConfigStore_load_fresh():
+    """ Load completely new collection
+
+        >>> ini = textwrap.dedent('''
+        ... [person:jeb]
+        ... firstname = Jebediah
+        ... lastname = Kerman
+        ... salary = 20000
+        ... male = True
+        ...
+        ... [person:val]
+        ... firstname = Valentina
+        ... lastname = Kerman
+        ... salary = 30000
+        ... male = False
+        ... ''')
+
+        >>> itemstore = lambda ctx: insist.ConfigurationStore.makeStore(
+        ...     ctx, IPerson, 'test')
+        >>> gsm = zope.component.getGlobalSiteManager()
+        >>> gsm.registerAdapter(itemstore, (IPerson, ), interfaces.IConfigurationStore, '')
+
+        >>> coll = {}
+        >>> store = PersonCollectionStore(coll)
+        >>> store.loads(ini)
+
+        >>> coll
+        {'jeb': <Person Jebediah Kerman, male, salary: 20000>,
+         'val': <Person Valentina Kerman, female, salary: 30000>}
+    """
+
+def doctest_CollectionConfigStore_load_changeaddremove():
+    """ Add one item and remove another
+
+    Load initial collection
+        >>> ini = textwrap.dedent('''
+        ... [person:jeb]
+        ... firstname = Jebediah
+        ... lastname = Kerman
+        ... salary = 20000
+        ... male = True
+        ...
+        ... [person:val]
+        ... firstname = Valentina
+        ... lastname = Kerman
+        ... salary = 30000
+        ... male = False
+        ... ''')
+
+        >>> itemstore = lambda ctx: insist.ConfigurationStore.makeStore(
+        ...     ctx, IPerson, 'test')
+        >>> gsm = zope.component.getGlobalSiteManager()
+        >>> gsm.registerAdapter(itemstore, (IPerson, ), interfaces.IConfigurationStore, '')
+
+        >>> coll = {}
+        >>> store = PersonCollectionStore(coll)
+        >>> store.loads(ini)
+
+        >>> coll
+        {'jeb': <Person Jebediah Kerman, male, salary: 20000>,
+         'val': <Person Valentina Kerman, female, salary: 30000>}
+
+    Save loaded items for future reference
+
+        >>> jeb = coll['jeb']
+        >>> val = coll['val']
+
+    Now let's change the configuration - remove one item and add another
+
+        >>> ini = textwrap.dedent('''
+        ... [person:bill]
+        ... firstname = Bill
+        ... lastname = Kerman
+        ... salary = 30000
+        ... male = True
+        ...
+        ... [person:val]
+        ... firstname = Valentina
+        ... lastname = Kerman
+        ... salary = 30000
+        ... male = False
+        ... ''')
+
+        >>> store.loads(ini)
+        >>> coll
+        {'bill': <Person Bill Kerman, male, salary: 30000>,
+         'val': <Person Valentina Kerman, female, salary: 30000>}
+
+        >>> bill = coll['bill']
+
+    Make sure we didn't just edit "jeb", but created new item. Also, `val`
+    should stay unchanged.
+
+        >>> jeb is coll['bill']
+        False
+
+        >>> val is coll['val']
+        True
+
+    Now, change the salary of a bill, and remove val
+
+        >>> ini = textwrap.dedent('''
+        ... [person:bill]
+        ... firstname = Bill
+        ... lastname = Kerman
+        ... salary = 50000
+        ... male = True
+        ... ''')
+
+        >>> store.loads(ini)
+        >>> coll
+        {'bill': <Person Bill Kerman, male, salary: 50000>}
+
+    Bill should not change his identity by this operation
+
+        >>> bill is coll['bill']
+        True
+    """
+
 
 
 def setUp(test):
