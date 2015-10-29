@@ -146,6 +146,7 @@ class CollectionConfigurationStore(ConfigurationStore):
     def dump(self, config=None):
         if config is None:
             config = ConfigParser.RawConfigParser()
+            config.optionxform = str
         for k, v in self.context.items():
             __traceback_info__ = (k, v)
             store = interfaces.IConfigurationStore(v)
