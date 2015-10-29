@@ -181,7 +181,6 @@ class CollectionConfigurationStore(ConfigurationStore):
 @zope.interface.implementer(interfaces.IFieldSerializer)
 class FieldSerializer(object):
     escape = '!'
-    none_marker = '!None'
 
     def __init__(self, field, context):
         self.field = field
@@ -194,13 +193,13 @@ class FieldSerializer(object):
     def serialize(self):
         value = getattr(self.context, self.field.__name__)
         if value is None:
-            return self.none_marker
+            return interfaces.NONE_MARKER
         else:
             result = self.serializeValue(value)
             return result.replace(self.escape, self.escape * 2)
 
     def deserialize(self, value):
-        if value == self.none_marker:
+        if value == interfaces.NONE_MARKER:
             decoded = None
         else:
             value = value.replace(self.escape * 2, self.escape)
