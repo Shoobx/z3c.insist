@@ -168,6 +168,19 @@ class CollectionConfigurationStore(ConfigurationStore):
     def getSectionHash(self, obj, config, section):
         return hash(tuple(config.items(section)))
 
+    def _createNewItem(self, config, section):
+        if hasattr(self, 'item_factory_typed'):
+            obj = self.item_factory_typed(config, section)
+        else:
+            obj = self.item_factory()
+        return obj
+
+    def _createItemConfigStore(self, obj, config, section):
+        store = interfaces.IConfigurationStore(obj)
+        store.section = section
+        store.root = self.root
+        return store
+
     def loadFromSection(self, config, section):
         """Load object from section and return name of the loaded object
 
@@ -184,15 +197,9 @@ class CollectionConfigurationStore(ConfigurationStore):
         if existing:
             obj = self.context[name]
         else:
-            if hasattr(self, 'item_factory_typed'):
-                obj = self.item_factory_typed(config, section)
-            else:
-                obj = self.item_factory()
+            obj = self._createNewItem(config, section)
 
         # Find the store object, that will handle loading
-        store = interfaces.IConfigurationStore(obj)
-        store.section = section
-        store.root = self.root
         confhash = self.getSectionHash(obj, config, section)
 
         # Check if configuration has changed
@@ -202,6 +209,20 @@ class CollectionConfigurationStore(ConfigurationStore):
 
         # Config has changed, we can load object with properties from
         # configuration.
+
+        # First of all, make sure class of the item didn't change. Otherwise we
+        # have to remove it and re-add, because property set for it may be
+        # completely different.
+        if existing:
+            newobj = self._createNewItem(config, section)
+            if newobj.__class__ is not obj.__class__:
+                # Yeah, class have changed, let's replace the item
+                del self.context[name]
+                obj = newobj
+                existing = False
+
+        # Now we can load properties into the object
+        store = self._createItemConfigStore(obj, config, section)
         store.load(config)
         obj.__insist_hash__ = confhash
 

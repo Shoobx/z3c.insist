@@ -35,6 +35,9 @@ class IPerson(zope.interface.Interface):
     salary = zope.schema.Int()
     male = zope.schema.Bool()
 
+class ICompany(zope.interface.Interface):
+    name = zope.schema.TextLine()
+
 
 @zope.interface.implementer(IPerson)
 class Person(object):
@@ -50,11 +53,34 @@ class Person(object):
              "male" if self.male else "female",
              self.salary)
 
+@zope.interface.implementer(ICompany)
+class Company(object):
+    def __init__(self, name=None):
+        self.name = name
+
+    def  __repr__(self):
+        return "<Company %s>" % self.name
+
 
 class PersonCollectionStore(insist.CollectionConfigurationStore):
     schema = IPerson
     section_prefix = 'person:'
     item_factory = Person
+
+
+class MixedClassCollectionStore(insist.CollectionConfigurationStore):
+    """Collection store that loads and dumps ICompany and IPerson objects into
+    the same collection.
+    """
+    section_prefix = 'item:'
+
+    def item_factory_typed(self, config, section):
+        itype = config.get(section, 'type')
+        if itype == 'person':
+            return Person()
+        else:
+            assert itype == 'company'
+            return Company()
 
 
 def doctest_FieldSerializer_None():
@@ -269,6 +295,64 @@ def doctest_CollectionConfigStore_load_changeaddremove():
 
         >>> bill is coll['bill']
         True
+    """
+
+def doctest_CollectionConfigStore_load_typed():
+    """ Test collections with items of different types
+
+    First, register adapters
+        >>> gsm = zope.component.getGlobalSiteManager()
+
+        >>> personstore = lambda ctx: insist.ConfigurationStore.makeStore(
+        ...     ctx, IPerson, 'person')
+        >>> gsm.registerAdapter(personstore, (IPerson, ),
+        ...                     interfaces.IConfigurationStore, '')
+
+        >>> companystore = lambda ctx: insist.ConfigurationStore.makeStore(
+        ...     ctx, ICompany, 'company')
+        >>> gsm.registerAdapter(companystore, (ICompany, ),
+        ...                     interfaces.IConfigurationStore, '')
+
+        >>> coll = {}
+        >>> store = MixedClassCollectionStore(coll)
+
+    Load initial data
+        >>> ini = textwrap.dedent('''
+        ... [item:jeb]
+        ... type = person
+        ... firstname = Jebediah
+        ... lastname = Kerman
+        ... salary = 20000
+        ... male = True
+        ...
+        ... [item:pp]
+        ... type = company
+        ... name = Pied Piper, Inc
+        ... ''')
+
+        >>> store.loads(ini)
+
+        >>> coll
+        {'jeb': <Person Jebediah Kerman, male, salary: 20000>,
+         'pp': <Company Pied Piper, Inc>}
+
+    Now, suddenly, jeb becomes a company
+
+        >>> ini = textwrap.dedent('''
+        ... [item:jeb]
+        ... type = company
+        ... name = Jeb Startup, Inc
+        ...
+        ... [item:pp]
+        ... type = company
+        ... name = Pied Piper, Inc
+        ... ''')
+
+        >>> store.loads(ini)
+        >>> coll
+        {'jeb': <Company Jeb Startup, Inc>,
+         'pp': <Company Pied Piper, Inc>}
+
     """
 
 
