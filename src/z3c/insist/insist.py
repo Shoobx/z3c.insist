@@ -317,6 +317,12 @@ class FileSectionsCollectionConfigurationStore(CollectionConfigurationStore):
     """
     filePostfix = '.ini'
 
+    def __init__(self, *args, **kw):
+        super(FileSectionsCollectionConfigurationStore, self).__init__(
+            *args, **kw)
+        # A cache, so that we need to read each config file at most once.
+        self.section_configs = {}
+
     def getConfigPath(self):
         raise NotImplemented
 
@@ -332,10 +338,12 @@ class FileSectionsCollectionConfigurationStore(CollectionConfigurationStore):
                 filename.endswith(self.filePostfix))]
 
     def getConfigForSection(self, section):
-        config = self._createConfigParser()
-        with open(self.getSectionPath(section), 'r') as file:
-            config.readfp(file)
-        return config
+        if section not in self.section_configs:
+            config = self._createConfigParser()
+            with open(self.getSectionPath(section), 'r') as file:
+                config.readfp(file)
+            self.section_configs[section] = config
+        return self.section_configs[section]
 
     def getSectionHash(self, obj, config, section):
         sec_config = self.getConfigForSection(section)
