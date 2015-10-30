@@ -244,6 +244,7 @@ class CollectionConfigurationStore(ConfigurationStore):
 class SeparateFileConfigurationStoreMixIn(object):
     allowMainConfigLoad = True
     dumpSectionStub = True
+    subConfig = None
 
     def getConfigPath(self):
         raise NotImplemented
@@ -285,7 +286,9 @@ class SeparateFileConfigurationStoreMixIn(object):
         configFilename = self.getConfigFilename()
         configPath = os.path.join(self.getConfigPath(), configFilename)
         # 2. Create a new sub-config object and load the data.
-        if not os.path.exists(configPath):
+        if self.subConfig is not None:
+            subconfig = self.subConfig
+        elif not os.path.exists(configPath):
             if not self.allowMainConfigLoad:
                 raise ValueError(
                     'Configuration file does not exist: %s' % configPath)
