@@ -326,6 +326,12 @@ class FileSectionsCollectionConfigurationStore(CollectionConfigurationStore):
         # A cache, so that we need to read each config file at most once.
         self.section_configs = {}
 
+    def _createItemConfigStore(self, obj, config, section):
+        store = super(FileSectionsCollectionConfigurationStore, self)\
+          ._createItemConfigStore(obj, config, section)
+        store.subConfig = self.section_configs.get(section)
+        return store
+
     def getConfigPath(self):
         raise NotImplemented
 
@@ -475,7 +481,7 @@ class DateTimeFieldSerializer(FieldSerializer):
         #   does not match format '%Y-%m-%dT%H:%M:%S.%f %Z'
         # and strptime isn't tops with timezones (does not support %z)
         #return dateutil.parser.parse(value)
-        
+
         return iso8601.parse_date(value)
 
 
