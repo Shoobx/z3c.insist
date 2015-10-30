@@ -185,18 +185,22 @@ class CollectionConfigurationStore(ConfigurationStore):
 @zope.interface.implementer(interfaces.ISeparateFileConfigurationStore)
 class SeparateFileConfigurationStoreMixIn(object):
 
+    dumpSectionStub = True
+
     def getConfigPath(self):
         raise NotImplemented
 
     def getConfigFilename(self):
         return self.section + '.ini'
 
+    def _dumpSubConfig(self, config):
+        super(SeparateFileConfigurationStoreMixIn, self).dump(config)
+
     def dump(self, config=None):
         # 1. Store all items in a separate configuration file.
         # 1.1. Create the config object and fill it.
-        subconfig = ConfigParser.RawConfigParser()
-        subconfig.optionxform = str
-        super(SeparateFileConfigurationStoreMixIn, self).dump(subconfig)
+        subconfig = self._createConfigParser()
+        self._dumpSubConfig(subconfig)
         # 1.2. Dump the config in a file.
         configFilename = self.getConfigFilename()
         configPath = os.path.join(self.getConfigPath(), configFilename)
@@ -205,25 +209,29 @@ class SeparateFileConfigurationStoreMixIn(object):
 
         # 2. Store a reference to the cofniguration file in the main
         #    configuration object.
-        if config is None:
-            config = ConfigParser.RawConfigParser()
-            config.optionxform = str
-        config.add_section(self.section)
-        config.set(self.section, 'config-file', configFilename)
+        # 2.1. Create the config object, if it does not exist.
+        config = self._createConfigParser(config)
+        # 2.2. Now dump the section stub in the original config object, if so
+        #      desired.
+        if self.dumpSectionStub:
+            config.add_section(self.section)
+            config.set(self.section, 'config-file', configFilename)
 
         return config
+
+    def _loadSubConfig(self, config):
+        super(SeparateFileConfigurationStoreMixIn, self).load(config)
 
     def load(self, config):
         # 1. Generate the config file path.
         configFilename = config.get(self.section, 'config-file')
         configPath = os.path.join(self.getConfigPath(), configFilename)
         # 2. Create a new sub-config object and load the data.
-        subconfig = ConfigParser.RawConfigParser()
-        subconfig.optionxform = str
+        subconfig = self._createConfigParser()
         with open(configPath, 'r') as fle:
             subconfig.readfp(fle)
         # 3. Load as usual from the sub-config.
-        super(SeparateFileConfigurationStoreMixIn, self).load(subconfig)
+        self._loadSubConfig(subconfig)
 
 
 class SeparateFileConfigurationStore(
