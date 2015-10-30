@@ -187,8 +187,7 @@ def doctest_SeparateFileConfigurationStore():
     Let's now dump our data:
 
        >>> obj = NoneTestObject()
-       >>> store = NoneTestStore.makeStore(
-       ...     obj, INoneTestSchema, 'test')
+       >>> store = NoneTestStore.makeStore(obj, INoneTestSchema, 'test')
 
     As we can see, a small stub of the configuration si written to the
     original store.
@@ -208,6 +207,21 @@ def doctest_SeparateFileConfigurationStore():
        test3 = To infinity!! And beyond!!
        test4 = !None
 
+    Let's now load the data again:
+
+       >>> obj2 = NoneTestObject()
+       >>> obj2.test1 = obj2.test2 = obj2.test3 = u'Test'
+       >>> obj2.test4 = 5
+       >>> store2 = NoneTestStore.makeStore(obj2, INoneTestSchema, 'test')
+
+       >>> store2.loads(store.dumps())
+       >>> obj2.test1
+       u'!None'
+       >>> obj2.test2
+       >>> obj2.test3
+       u'To infinity! And beyond!'
+       >>> obj2.test4
+
     We can also tell the store not to leave the stub in the main config
     file. That requires extra code though to ensure that all config files are
     loaded.
@@ -215,6 +229,32 @@ def doctest_SeparateFileConfigurationStore():
        >>> store.dumpSectionStub = False
        >>> print store.dumps()
        <BLANKLINE>
+
+    Finally, in order to ease migration from monolithic configuration files to
+    split files, the store reads the main configuration if it cannot find the
+    file.
+
+       >>> os.remove(os.path.join(dir, 'test.ini'))
+       >>> os.listdir(dir)
+       []
+
+       >>> obj3 = NoneTestObject()
+       >>> obj3.test1 = obj3.test2 = obj3.test3 = u'Test'
+       >>> store3 = NoneTestStore.makeStore(obj3, INoneTestSchema, 'test')
+
+       >>> store3.loads('''
+       ... [test]
+       ... test1 = !!None
+       ... test2 = !None
+       ... test3 = To infinity!! And beyond!!
+       ... test4 = !None
+       ... ''')
+       >>> obj3.test1
+       u'!None'
+       >>> obj3.test2
+       >>> obj3.test3
+       u'To infinity! And beyond!'
+       >>> obj3.test4
     """
 
 def doctest_SeparateFileCollectionConfigurationStore():

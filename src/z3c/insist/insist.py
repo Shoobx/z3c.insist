@@ -184,7 +184,7 @@ class CollectionConfigurationStore(ConfigurationStore):
 
 @zope.interface.implementer(interfaces.ISeparateFileConfigurationStore)
 class SeparateFileConfigurationStoreMixIn(object):
-
+    allowMainConfigLoad = True
     dumpSectionStub = True
 
     def getConfigPath(self):
@@ -227,9 +227,17 @@ class SeparateFileConfigurationStoreMixIn(object):
         configFilename = self.getConfigFilename()
         configPath = os.path.join(self.getConfigPath(), configFilename)
         # 2. Create a new sub-config object and load the data.
-        subconfig = self._createConfigParser()
-        with open(configPath, 'r') as fle:
-            subconfig.readfp(fle)
+        if not os.path.exists(configPath):
+            if not self.allowMainConfigLoad:
+                raise ValueError(
+                    'Configuration file does not exist: %s' % configPath)
+            # Assume that the configuration is part of the main config. This
+            # allows for controlled migration.
+            subconfig = config
+        else:
+            subconfig = self._createConfigParser()
+            with open(configPath, 'r') as fle:
+                subconfig.readfp(fle)
         # 3. Load as usual from the sub-config.
         self._loadSubConfig(subconfig)
 
