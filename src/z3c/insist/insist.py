@@ -334,9 +334,13 @@ class FileSectionsCollectionConfigurationStore(CollectionConfigurationStore):
 
     def getConfigForSection(self, section):
         config = self._createConfigParser()
-        with open(self.getSectionPath(), 'r') as file:
+        with open(self.getSectionPath(section), 'r') as file:
             config.readfp(file)
         return config
+
+    def getSectionHash(self, obj, config, section):
+        sec_config = self.getConfigForSection(section)
+        return hash(tuple(sec_config.items(section)))
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
