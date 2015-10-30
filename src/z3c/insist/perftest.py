@@ -4,10 +4,12 @@
 #
 ###############################################################################
 """Insist Performance Tests"""
+import ConfigParser
 import prettytable
 import collections
 import datetime
 import os
+import shutil
 import sys
 import time
 import zope.component
@@ -57,6 +59,17 @@ class SimpleCollectionStore(insist.CollectionConfigurationStore):
 class SimpleItemStore(insist.ConfigurationStore):
     schema = INumberObject
 
+def simpleUpdateConfigFile():
+    # There is only one choice to update the monolithic file. Load the file,
+    # update the section and resave.
+    cp = ConfigParser.RawConfigParser()
+    cp.optionxform = str
+    with open(os.path.join(DATA_DIRECTORY, 'main.ini'), 'r') as file:
+        cp.readfp(file)
+    cp.set('number:0', 'repeatedText', 'Modified')
+    with open(os.path.join(DATA_DIRECTORY, 'main.ini'), 'w') as file:
+        cp.write(file)
+
 
 class FileItemsCollectionStore(insist.FileSectionsCollectionConfigurationStore):
     schema = INumberObject
@@ -75,12 +88,21 @@ class FileItemStore(insist.SeparateFileConfigurationStore):
     def getConfigPath(self):
         return DATA_DIRECTORY
 
+def fileUpdateConfigFile():
+    # We only need to update the right file.
+    cp = ConfigParser.RawConfigParser()
+    cp.optionxform = str
+    with open(os.path.join(DATA_DIRECTORY, 'number:0.ini'), 'r') as file:
+        cp.readfp(file)
+    cp.set('number:0', 'repeatedText', 'Modified')
+    with open(os.path.join(DATA_DIRECTORY, 'number:0.ini'), 'w') as file:
+        cp.write(file)
 
 
 class PerformanceTest(object):
     storeFactories = (
-        (SimpleCollectionStore, SimpleItemStore),
-        (FileItemsCollectionStore, FileItemStore),
+        (SimpleCollectionStore, SimpleItemStore, simpleUpdateConfigFile),
+        (FileItemsCollectionStore, FileItemStore, fileUpdateConfigFile),
         )
 
     def __init__(self):
@@ -92,9 +114,11 @@ class PerformanceTest(object):
             coll[unicode(number)] = NumberObject(number)
         return coll
 
-    def runOne(self, collectionFactory, itemFactory, data):
+    def runOne(self, collectionFactory, itemFactory, updateCallable, data):
         zope.component.testing.setUp(None)
         testing.setUpSerializers()
+        shutil.rmtree(DATA_DIRECTORY)
+        os.mkdir(DATA_DIRECTORY)
 
         # Register the item factory as an adapter
         zope.component.provideAdapter(itemFactory)
@@ -104,6 +128,7 @@ class PerformanceTest(object):
         main_ini = os.path.join(DATA_DIRECTORY, 'main.ini')
 
         # 1. Dump data.
+        print collectionFactory.__name__, 'Dump...'
         dump_start = time.time()
         config = store.dump()
         with open(main_ini, 'w') as file:
@@ -111,6 +136,7 @@ class PerformanceTest(object):
         dump_end = time.time()
 
         # 2. Load data.
+        print collectionFactory.__name__, 'Load...'
         data2 = collections.OrderedDict()
         store2 = collectionFactory(data2)
         load_start = time.time()
@@ -121,13 +147,12 @@ class PerformanceTest(object):
         load_end = time.time()
 
         # 3. Update data.
-        # Modify the original data and redump.
-        data['0'].repeatedText = u'Modified'
-        config = store.dump()
-        with open(main_ini, 'w') as file:
-            config.write(file)
+        print collectionFactory.__name__, 'Update...'
+        # Modify the original data.
+        updateCallable()
         # Now update previously loaded data.
         update_start = time.time()
+        store2 = collectionFactory(data2)
         config = store2._createConfigParser()
         with open(main_ini, 'r') as file:
             config.readfp(file)
@@ -153,12 +178,10 @@ class PerformanceTest(object):
 
     def run(self):
         data = self.generateData()
-        for collectionFactory, itemFactory in self.storeFactories:
-            self.runOne(collectionFactory, itemFactory, data)
+        for coll, item, update in self.storeFactories:
+            self.runOne(coll, item, update, data)
 
 def main(args=None):
-    if not os.path.exists(DATA_DIRECTORY):
-        os.mkdir(DATA_DIRECTORY)
     pt = PerformanceTest()
     pt.run()
     pt.printResults()
