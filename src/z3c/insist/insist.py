@@ -284,15 +284,7 @@ class SeparateFileConfigurationStoreMixIn(object):
         configFilename = self.getConfigFilename()
         configPath = os.path.join(self.getConfigPath(), configFilename)
 
-        # 2. If the filename has not changed since we last loaded the object,
-        #    we simply return.
-        obj_ts = getattr(self.context, "__insist_timestamp__", None)
-        if (obj_ts is not None and
-            os.path.exists(configPath) and
-            obj_ts > os.path.getmtime(configPath)):
-            return
-
-        # 3. Create a new sub-config object and load the data.
+        # 2. Create a new sub-config object and load the data.
         if self.subConfig is not None:
             subconfig = self.subConfig
         elif not os.path.exists(configPath):
@@ -307,16 +299,8 @@ class SeparateFileConfigurationStoreMixIn(object):
             with open(configPath, 'r') as fle:
                 subconfig.readfp(fle)
 
-        # 4. Load as usual from the sub-config.
+        # 3. Load as usual from the sub-config.
         self._loadSubConfig(subconfig)
-
-        # 5. Mark the latest time the object was loaded.
-        try:
-            self.context.__insist_timestamp__ = time.time()
-        except AttributeError, err:
-            # Some types do not like arbitrary attributes being attached to
-            # them.
-            pass
 
 class SeparateFileConfigurationStore(
         SeparateFileConfigurationStoreMixIn, ConfigurationStore):
