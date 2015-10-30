@@ -286,6 +286,84 @@ def doctest_SeparateFileCollectionConfigurationStore():
 
     """
 
+def doctest_FileSectionsCollectionConfigurationStore():
+    """File Section Configuration Store Test
+
+    If you do not want to store a stub of a section in the main config file,
+    you have to provide the collection config store with the ability to
+    discover configuration files and only select the correct ones.
+
+    Let's setup a collection store with its file object store that does not
+    dump the stub.
+
+       >>> import tempfile
+       >>> dir = tempfile.mkdtemp()
+
+       >>> class SimpleCollectionStore(
+       ...         insist.FileSectionsCollectionConfigurationStore):
+       ...
+       ...     schema = ISimple
+       ...     section_prefix = 'simple:'
+       ...     item_factory = Simple
+       ...
+       ...     def getConfigPath(self):
+       ...         return dir
+
+       >>> @zope.component.adapter(ISimple)
+       ... @zope.interface.implementer_only(interfaces.IConfigurationStore)
+       ... class SimpleStore(insist.SeparateFileConfigurationStore):
+       ...     dumpSectionStub = False
+       ...     schema = ISimple
+       ...
+       ...     def getConfigPath(self):
+       ...         return dir
+
+       >>> reg = zope.component.provideAdapter(SimpleStore)
+
+    Okay, now things are getting exciting. Let's dump a collection and see
+    what happens:
+
+       >>> coll = collections.OrderedDict([
+       ...     ('one', Simple(u'Number 1')),
+       ...     ('two', Simple(u'Two is a charm')),
+       ...     ('three', Simple(u'The tail.'))
+       ...     ])
+
+       >>> store = SimpleCollectionStore(coll)
+       >>> print store.dumps()
+       <BLANKLINE>
+
+       >>> for fn in sorted(os.listdir(dir)):
+       ...     if not fn.startswith(store.section_prefix):
+       ...         continue
+       ...     with open(os.path.join(dir, fn)) as file:
+       ...         print '---', fn, '---'
+       ...         print file.read()
+       --- simple:one.ini ---
+       [simple:one]
+       text = Number 1
+       <BLANKLINE>
+       --- simple:three.ini ---
+       [simple:three]
+       text = The tail.
+       <BLANKLINE>
+       --- simple:two.ini ---
+       [simple:two]
+       text = Two is a charm
+
+    Now the more interesting part, loading everything again:
+
+       >>> coll2 = {}
+       >>> store2 = SimpleCollectionStore(coll2)
+       >>> store2.loads(store.dumps())
+
+       >>> import pprint
+       >>> pprint.pprint(coll2)
+       {'one': Simple(u'Number 1'),
+        'three': Simple(u'The tail.'),
+        'two': Simple(u'Two is a charm')}
+    """
+
 
 def setUp(test):
     zope.component.testing.setUp(test)

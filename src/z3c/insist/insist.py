@@ -224,7 +224,7 @@ class SeparateFileConfigurationStoreMixIn(object):
 
     def load(self, config):
         # 1. Generate the config file path.
-        configFilename = config.get(self.section, 'config-file')
+        configFilename = self.getConfigFilename()
         configPath = os.path.join(self.getConfigPath(), configFilename)
         # 2. Create a new sub-config object and load the data.
         subconfig = self._createConfigParser()
@@ -241,6 +241,36 @@ class SeparateFileConfigurationStore(
 class SeparateFileCollectionConfigurationStore(
         SeparateFileConfigurationStoreMixIn, CollectionConfigurationStore):
     pass
+
+class FileSectionsCollectionConfigurationStore(CollectionConfigurationStore):
+    """File Section Configuration Store
+
+    These are collection stores that look for sections in other files. A base
+    implementation is provided that assumes that the filenames and section
+    names are identical.
+    """
+    filePostfix = '.ini'
+
+    def getConfigPath(self):
+        raise NotImplemented
+
+    def getSectionPath(self, section):
+        return os.path.join(self.getConfigPath(), section + self.filePostfix)
+
+    def selectSections(self, sections):
+        baseDir = self.getConfigPath()
+        return [
+            filename[:-len(self.filePostfix)]
+            for filename in os.listdir(baseDir)
+            if (filename.startswith(self.section_prefix) and
+                filename.endswith(self.filePostfix))]
+
+    def getConfigForSection(self, section):
+        config = self._createConfigParser()
+        with open(self.getSectionPath(), 'r') as file:
+            config.readfp(file)
+        return config
+
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
 class FieldSerializer(object):
