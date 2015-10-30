@@ -49,6 +49,12 @@ class ConfigurationStore(object):
             store.section = section
         return store
 
+    def _createConfigParser(self, config=None):
+        if config is None:
+            config = ConfigParser.RawConfigParser()
+            config.optionxform = str
+        return config
+
     def _get_fields(self):
         """Returns a sequence of (name, field) pairs"""
         return zope.schema.getFieldsInOrder(self.schema)
@@ -74,9 +80,7 @@ class ConfigurationStore(object):
             config.set(self.section, fn, state)
 
     def dump(self, config=None):
-        if config is None:
-            config = ConfigParser.RawConfigParser()
-            config.optionxform = str
+        config = self._createConfigParser(config)
         self._dump(config)
         return config
 
@@ -111,7 +115,7 @@ class ConfigurationStore(object):
 
     def loads(self, cfgstr):
         buf = StringIO(cfgstr)
-        config = ConfigParser.RawConfigParser()
+        config = self._createConfigParser()
         config.readfp(buf)
         self.load(config)
 
@@ -145,9 +149,7 @@ class CollectionConfigurationStore(ConfigurationStore):
         self.context[name] = obj
 
     def dump(self, config=None):
-        if config is None:
-            config = ConfigParser.RawConfigParser()
-            config.optionxform = str
+        config = self._createConfigParser(config)
         for k, v in self.context.items():
             __traceback_info__ = (k, v)
             store = interfaces.IConfigurationStore(v)
