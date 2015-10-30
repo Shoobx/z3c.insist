@@ -79,7 +79,7 @@ class FileItemStore(insist.SeparateFileConfigurationStore):
 
 class PerformanceTest(object):
     storeFactories = (
-        #(SimpleCollectionStore, SimpleItemStore),
+        (SimpleCollectionStore, SimpleItemStore),
         (FileItemsCollectionStore, FileItemStore),
         )
 
@@ -133,6 +133,7 @@ class PerformanceTest(object):
             config.readfp(file)
         store2.load(config)
         update_end = time.time()
+        assert data2['0'].repeatedText == u'Modified'
 
         zope.component.testing.tearDown(None)
 
