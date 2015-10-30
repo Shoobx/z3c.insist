@@ -5,10 +5,11 @@
 ###############################################################################
 """Insist Performance Tests"""
 import ConfigParser
-import prettytable
+import argparse
 import collections
 import datetime
 import os
+import prettytable
 import shutil
 import sys
 import time
@@ -107,12 +108,13 @@ class PerformanceTest(object):
         (FileItemsCollectionStore, FileItemStore, fileUpdateConfigFile),
         )
 
-    def __init__(self):
+    def __init__(self, amount=1000):
         self.results = collections.OrderedDict()
+        self.amount = amount
 
-    def generateData(self, amount=10000):
+    def generateData(self):
         coll = collections.OrderedDict()
-        for number in range(amount):
+        for number in range(self.amount):
             coll[unicode(number)] = NumberObject(number)
         return coll
 
@@ -183,9 +185,22 @@ class PerformanceTest(object):
         for coll, item, update in self.storeFactories:
             self.runOne(coll, item, update, data)
 
+parser = argparse.ArgumentParser(
+    prog='perftest',
+    description='Test performance of z3c.insist.')
+parser.add_argument(
+    '-a', '--amount', dest='amount', type=int, default=10000,
+    help="The amount of sections to create.")
+parser.add_argument(
+    '-v', '--verbose', dest='verbose', action="count", default=0,
+    help="Increase verbosity of the output.")
+parser.add_argument(
+    '-q', '--quiet', dest='verbose', action='store_const', const=0,
+    help="Print nothing")
 
 
-def main(args=None):
-    pt = PerformanceTest()
+def main(args=sys.argv[1:]):
+    args = parser.parse_args(args)
+    pt = PerformanceTest(args.amount)
     pt.run()
     pt.printResults()
