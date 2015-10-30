@@ -1,14 +1,22 @@
+###############################################################################
+#
+# Copyright 2013-15 by Shoobx, Inc.
+#
+###############################################################################
 """insist -- Persistence to ini files
 
 Test fixture.
 """
+import collections
 import doctest
+import os
 import unittest
 
+import zope.interface
 import zope.component
 import zope.component.testing
 
-from z3c.insist import insist, testing
+from z3c.insist import insist, interfaces, testing
 
 
 class INoneTestSchema(zope.interface.Interface):
@@ -25,6 +33,17 @@ class NoneTestObject(object):
         self.test3 = u"To infinity! And beyond!"
         self.test4 = None
 
+
+class ISimple(zope.interface.Interface):
+    text = zope.schema.Text()
+
+
+class Simple(object):
+    zope.interface.implements(ISimple)
+    def __init__(self, text=None):
+        self.text = text
+    def __repr__(self):
+        return 'Simple(%r)' % self.text
 
 def doctest_FieldSerializer_None():
     """Test escaping of None values and handling of the escape character
@@ -90,6 +109,172 @@ def doctest_ConfigurationStore_section():
        >>> store.section = 'specific'
        >>> store.section
        'specific'
+
+    """
+
+def doctest_CollectionConfigurationStore():
+    """Collection Configuration Store Tests
+
+    This configuration store orchestrates storage of collections/mappings. To
+    make the collection store usable a few attributes and methods must be
+    provided:
+
+       >>> class SimpleCollectionStore(insist.CollectionConfigurationStore):
+       ...     schema = ISimple
+       ...     section_prefix = 'simple:'
+       ...     item_factory = Simple
+
+    We also have to register a store for the object itself:
+
+       >>> @zope.component.adapter(ISimple)
+       ... @zope.interface.implementer(interfaces.IConfigurationStore)
+       ... class SimpleStore(insist.ConfigurationStore):
+       ...     schema = ISimple
+
+       >>> reg = zope.component.provideAdapter(SimpleStore)
+
+    Now, let's create a simple collection and create a store for it:
+
+       >>> coll = collections.OrderedDict([
+       ...     ('one', Simple(u'Number 1')),
+       ...     ('two', Simple(u'Two is a charm')),
+       ...     ('three', Simple(u'The tail.'))
+       ...     ])
+
+       >>> store = SimpleCollectionStore(coll)
+
+    Let's have a look at the dump:
+
+       >>> print store.dumps()
+       [simple:one]
+       text = Number 1
+       <BLANKLINE>
+       [simple:two]
+       text = Two is a charm
+       <BLANKLINE>
+       [simple:three]
+       text = The tail.
+
+    Now let's test the roundtrip:
+
+       >>> coll2 = {}
+       >>> store2 = SimpleCollectionStore(coll2)
+       >>> store2.loads(store.dumps())
+
+       >>> import pprint
+       >>> pprint.pprint(coll2)
+       {'one': Simple(u'Number 1'),
+        'three': Simple(u'The tail.'),
+        'two': Simple(u'Two is a charm')}
+
+    """
+
+
+def doctest_SeparateFileConfigurationStore():
+    """Separate File Configuration Store Test
+
+    As the name suggests, this store allows its configuration to be stored in
+    a separate file. For this store to work, we need to implement a method
+    that tells the store where to store the file:
+
+       >>> import tempfile
+       >>> dir = tempfile.mkdtemp()
+
+       >>> class NoneTestStore(insist.SeparateFileConfigurationStore):
+       ...     def getConfigPath(self):
+       ...         return dir
+
+    Let's now dump our data:
+
+       >>> obj = NoneTestObject()
+       >>> store = NoneTestStore.makeStore(
+       ...     obj, INoneTestSchema, 'test')
+
+    As we can see, a small stub of the configuration si written to the
+    original store.
+
+       >>> print store.dumps()
+       [test]
+       config-file = test.ini
+
+    But the actual data is in the new file, which is named by default like the
+    section:
+
+       >>> with open(os.path.join(dir, 'test.ini')) as file:
+       ...     print file.read()
+       [test]
+       test1 = !!None
+       test2 = !None
+       test3 = To infinity!! And beyond!!
+       test4 = !None
+    """
+
+def doctest_SeparateFileCollectionConfigurationStore():
+    """Separate File Collection Configuration Store Test
+
+    This class is very similar to the regular colelction store except that all
+    items are stored in a separate file. So let's do the setup:
+
+       >>> import tempfile
+       >>> dir = tempfile.mkdtemp()
+
+       >>> class SimpleCollectionStore(
+       ...         insist.SeparateFileCollectionConfigurationStore):
+       ...
+       ...     section = 'simple-collection'
+       ...     schema = ISimple
+       ...     section_prefix = 'simple:'
+       ...     item_factory = Simple
+       ...
+       ...     def getConfigPath(self):
+       ...         return dir
+
+       >>> @zope.component.adapter(ISimple)
+       ... @zope.interface.implementer(interfaces.IConfigurationStore)
+       ... class SimpleStore(insist.ConfigurationStore):
+       ...     schema = ISimple
+
+       >>> reg = zope.component.provideAdapter(SimpleStore)
+
+    Now, let's create a simple collection and create a store for it:
+
+       >>> coll = collections.OrderedDict([
+       ...     ('one', Simple(u'Number 1')),
+       ...     ('two', Simple(u'Two is a charm')),
+       ...     ('three', Simple(u'The tail.'))
+       ...     ])
+
+       >>> store = SimpleCollectionStore(coll)
+
+    Let's have a look at the dump:
+
+       >>> print store.dumps()
+       [simple-collection]
+       config-file = simple-collection.ini
+
+       >>> with open(os.path.join(dir, 'simple-collection.ini')) as file:
+       ...     print file.read()
+       [simple:one]
+       text = Number 1
+       <BLANKLINE>
+       [simple:two]
+       text = Two is a charm
+       <BLANKLINE>
+       [simple:three]
+       text = The tail.
+
+
+    Let's now ensure that we can load the data again:
+
+       >>> coll2 = {}
+       >>> store2 = SimpleCollectionStore(coll2)
+       >>> store2.loads(store.dumps())
+
+       >>> import pprint
+       >>> pprint.pprint(coll2)
+       {'one': Simple(u'Number 1'),
+        'three': Simple(u'The tail.'),
+        'two': Simple(u'Two is a charm')}
 
     """
 

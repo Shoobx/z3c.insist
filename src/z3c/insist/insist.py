@@ -1,11 +1,12 @@
 ###############################################################################
 #
-# Copyright 2013 by Shoobx, Inc.
+# Copyright 2013-15 by Shoobx, Inc.
 #
 ###############################################################################
 """z3c.insist -- Persistence to ini files"""
 import datetime
 import decimal
+import os
 import ConfigParser
 from cStringIO import StringIO
 
@@ -178,6 +179,58 @@ class CollectionConfigurationStore(ConfigurationStore):
         if hasattr(store, 'loadAfterAdd'):
             store.loadAfterAdd(config)
 
+
+@zope.interface.implementer(interfaces.ISeparateFileConfigurationStore)
+class SeparateFileConfigurationStoreMixIn(object):
+
+    def getConfigPath(self):
+        raise NotImplemented
+
+    def getConfigFilename(self):
+        return self.section + '.ini'
+
+    def dump(self, config=None):
+        # 1. Store all items in a separate configuration file.
+        # 1.1. Create the config object and fill it.
+        subconfig = ConfigParser.RawConfigParser()
+        subconfig.optionxform = str
+        super(SeparateFileConfigurationStoreMixIn, self).dump(subconfig)
+        # 1.2. Dump the config in a file.
+        configFilename = self.getConfigFilename()
+        configPath = os.path.join(self.getConfigPath(), configFilename)
+        with open(configPath, 'w') as file:
+            subconfig.write(file)
+
+        # 2. Store a reference to the cofniguration file in the main
+        #    configuration object.
+        if config is None:
+            config = ConfigParser.RawConfigParser()
+            config.optionxform = str
+        config.add_section(self.section)
+        config.set(self.section, 'config-file', configFilename)
+
+        return config
+
+    def load(self, config):
+        # 1. Generate the config file path.
+        configFilename = config.get(self.section, 'config-file')
+        configPath = os.path.join(self.getConfigPath(), configFilename)
+        # 2. Create a new sub-config object and load the data.
+        subconfig = ConfigParser.RawConfigParser()
+        subconfig.optionxform = str
+        with open(configPath, 'r') as fle:
+            subconfig.readfp(fle)
+        # 3. Load as usual from the sub-config.
+        super(SeparateFileConfigurationStoreMixIn, self).load(subconfig)
+
+
+class SeparateFileConfigurationStore(
+        SeparateFileConfigurationStoreMixIn, ConfigurationStore):
+    pass
+
+class SeparateFileCollectionConfigurationStore(
+        SeparateFileConfigurationStoreMixIn, CollectionConfigurationStore):
+    pass
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
 class FieldSerializer(object):
