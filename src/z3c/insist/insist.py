@@ -185,14 +185,6 @@ class CollectionConfigurationStore(ConfigurationStore):
             obj = self.item_factory()
         return obj
 
-    def needsLoading(self, obj, config, section):
-        confhash = self.getSectionHash(obj, config, section)
-        # Check if configuration has changed
-        if getattr(obj, "__insist_hash__", None) == confhash:
-            return False
-
-        return True
-
     def loadFromSection(self, config, section):
         """Load object from section and return name of the loaded object
 
@@ -210,7 +202,10 @@ class CollectionConfigurationStore(ConfigurationStore):
         else:
             obj = self._createNewItem(config, section)
 
-        if not self.needsLoading(obj, config, section):
+        confhash = self.getSectionHash(obj, config, section)
+
+        # Check if configuration has changed
+        if getattr(obj, "__insist_hash__", None) == confhash:
             return name
 
         # Config has changed, we can load object with properties from
@@ -230,8 +225,7 @@ class CollectionConfigurationStore(ConfigurationStore):
         # Now we can load properties into the object
         store = self._createItemConfigStore(obj, config, section)
         store.load(config)
-        obj.__insist_hash__ = self.getSectionHash(obj, config, section)
-        obj.__insist_timestamp__ = time.time()
+        obj.__insist_hash__ = confhash
 
         if not existing:
             # Let everyone know the object is being added to a collection
@@ -376,23 +370,12 @@ class FileSectionsCollectionConfigurationStore(CollectionConfigurationStore):
         return self.section_configs[section]
 
     def getSectionHash(self, obj, config, section):
-        sec_config = self.getConfigForSection(section)
-        return hash(tuple(sec_config.items(section)))
-
-    def needsLoading(self, obj, config, section):
         # 1. Generate the config file path.
         sectionPath = self.getSectionPath(section)
-
-        # 2. If the filename has not changed since we last loaded the object,
-        #    we simply return.
-        obj_ts = getattr(obj, "__insist_timestamp__", None)
-        if (obj_ts is not None and
-            os.path.exists(sectionPath) and
-            obj_ts > os.path.getmtime(sectionPath)):
-            return False
-
-        return super(FileSectionsCollectionConfigurationStore, self)\
-          .needsLoading(obj, config, section)
+        # 2. Us the mod time of the file as a hash
+        if not os.path.exists(sectionPath):
+            return None
+        return os.path.getmtime(sectionPath)
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
