@@ -50,5 +50,10 @@ setup(
         'zope.component',
         'zope.lifecycleevent',
         'iso8601',
-    ]
+    ],
+    entry_points={
+        'console_scripts': [
+            'perftest = z3c.insist.perftest:main',
+            ],
+        }
 )
