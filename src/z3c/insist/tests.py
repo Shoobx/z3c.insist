@@ -207,6 +207,14 @@ def doctest_SeparateFileConfigurationStore():
        test2 = !None
        test3 = To infinity!! And beyond!!
        test4 = !None
+
+    We can also tell the store not to leave the stub in the main config
+    file. That requires extra code though to ensure that all config files are
+    loaded.
+
+       >>> store.dumpSectionStub = False
+       >>> print store.dumps()
+       <BLANKLINE>
     """
 
 def doctest_SeparateFileCollectionConfigurationStore():
