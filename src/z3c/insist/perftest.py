@@ -44,10 +44,12 @@ class NumberObject(object):
             return
         self.name = unicode(number)
         self.number = number
-        self.repeatedText = TO_BE_REPEATED * number
+        self.repeatedText = TO_BE_REPEATED * (number % 10)
         self.isEven = bool(number % 2)
         self.date = datetime.date.today() + datetime.timedelta(days=number)
 
+    def __repr__(self):
+        return 'NumberObject(%s)' % self.name
 
 class SimpleCollectionStore(insist.CollectionConfigurationStore):
     schema = INumberObject
@@ -108,7 +110,7 @@ class PerformanceTest(object):
     def __init__(self):
         self.results = collections.OrderedDict()
 
-    def generateData(self, amount=1000):
+    def generateData(self, amount=10000):
         coll = collections.OrderedDict()
         for number in range(amount):
             coll[unicode(number)] = NumberObject(number)
@@ -180,6 +182,8 @@ class PerformanceTest(object):
         data = self.generateData()
         for coll, item, update in self.storeFactories:
             self.runOne(coll, item, update, data)
+
+
 
 def main(args=None):
     pt = PerformanceTest()
