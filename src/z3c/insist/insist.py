@@ -148,13 +148,18 @@ class CollectionConfigurationStore(ConfigurationStore):
     def addItem(self, name, obj):
         self.context[name] = obj
 
+    def _createItemConfigStore(self, obj, config, section):
+        store = interfaces.IConfigurationStore(obj)
+        store.section = section
+        store.root = self.root
+        return store
+
     def dump(self, config=None):
         config = self._createConfigParser(config)
         for k, v in self.context.items():
             __traceback_info__ = (k, v)
-            store = interfaces.IConfigurationStore(v)
-            store.section = self.section_prefix + unicode(k).encode('utf-8')
-            store.root = self.root
+            store = self._createItemConfigStore(
+                v, config, self.section_prefix + unicode(k).encode('utf-8'))
             store.dump(config)
         return config
 
@@ -178,12 +183,6 @@ class CollectionConfigurationStore(ConfigurationStore):
         else:
             obj = self.item_factory()
         return obj
-
-    def _createItemConfigStore(self, obj, config, section):
-        store = interfaces.IConfigurationStore(obj)
-        store.section = section
-        store.root = self.root
-        return store
 
     def loadFromSection(self, config, section):
         """Load object from section and return name of the loaded object
