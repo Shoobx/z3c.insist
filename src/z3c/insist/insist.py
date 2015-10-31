@@ -321,6 +321,7 @@ class FileSectionsCollectionConfigurationStore(CollectionConfigurationStore):
     implementation is provided that assumes that the filenames and section
     names are identical.
     """
+    allowMainConfigLoad = True
     filePostfix = '.ini'
 
     def __init__(self, *args, **kw):
@@ -343,11 +344,20 @@ class FileSectionsCollectionConfigurationStore(CollectionConfigurationStore):
 
     def selectSections(self, sections):
         baseDir = self.getConfigPath()
-        return [
+        file_sections = [
             filename[:-len(self.filePostfix)]
             for filename in os.listdir(baseDir)
             if (filename.startswith(self.section_prefix) and
                 filename.endswith(self.filePostfix))]
+        if file_sections:
+            return file_sections
+        # If we allow loading via main config file, let's use the usual way to
+        # lookup sections.
+        if not self.allowMainConfigLoad:
+            return []
+        return super(FileSectionsCollectionConfigurationStore, self)\
+          .selectSections(sections)
+
 
     def getConfigForSection(self, section):
         if section not in self.section_configs:
