@@ -204,8 +204,11 @@ class CollectionConfigurationStore(ConfigurationStore):
 
         confhash = self.getSectionHash(obj, config, section)
 
-        # Check if configuration has changed
-        if getattr(obj, "__insist_hash__", None) == confhash:
+        # Check if configuration has changed. Note that in some cases when the
+        # object is new, the hash might not have been computable and thus
+        # None. In those cases we want to go on.
+        if confhash is not None and \
+          getattr(obj, "__insist_hash__", None) == confhash:
             return name
 
         # Config has changed, we can load object with properties from
@@ -225,6 +228,7 @@ class CollectionConfigurationStore(ConfigurationStore):
         # Now we can load properties into the object
         store = self._createItemConfigStore(obj, config, section)
         store.load(config)
+        # Set the confhash.
         obj.__insist_hash__ = confhash
 
         if not existing:
