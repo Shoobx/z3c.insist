@@ -7,6 +7,7 @@
 import datetime
 import decimal
 import ConfigParser
+import logging
 from cStringIO import StringIO
 
 import iso8601
@@ -15,6 +16,9 @@ import zope.component
 from zope.schema import vocabulary
 
 from z3c.insist import interfaces
+
+
+log = logging.getLogger(__name__)
 
 
 NONE_MARKER = '!None'
@@ -137,6 +141,10 @@ class CollectionConfigurationStore(ConfigurationStore):
     # has to be reloaded.
     supports_sync = True
 
+    _deleted = 0
+    _added = 0
+    _reloaded = 0
+
     def selectSections(self, sections):
         """Return relevant sections from config
         """
@@ -149,6 +157,7 @@ class CollectionConfigurationStore(ConfigurationStore):
         return section[len(self.section_prefix):]
 
     def addItem(self, name, obj):
+        self._added += 1
         self.context[name] = obj
 
     def dump(self, config=None):
@@ -163,6 +172,10 @@ class CollectionConfigurationStore(ConfigurationStore):
         return config
 
     def load(self, config):
+        self._deleted = 0
+        self._added = 0
+        self._reloaded = 0
+
         if not self.supports_sync:
             # No sync support, just delete all the items
             for k in self.context.keys():
@@ -178,7 +191,22 @@ class CollectionConfigurationStore(ConfigurationStore):
         for k in unloaded:
             self.delete(k)
 
+        self._logStatus()
+
+    def _logStatus(self):
+        if not self.supports_sync:
+            return
+
+        if not self._deleted and not self._added and not self._reloaded:
+            return
+
+        log.info("Insist collection loading status for '%s': "
+                 "%s reloaded, %s added, %s deleted",
+                 self.section_prefix,
+                 self._reloaded, self._added, self._deleted)
+
     def delete(self, key):
+        self._deleted += 1
         del self.context[key]
 
     def _createNewItem(self, config, section):
@@ -229,6 +257,9 @@ class CollectionConfigurationStore(ConfigurationStore):
         # Config has changed, we can load object with properties from
         # configuration.
 
+        if existing:
+            self._reloaded += 1
+
         # First of all, make sure class of the item didn't change. Otherwise we
         # have to remove it and re-add, because property set for it may be
         # completely different.
@@ -236,7 +267,7 @@ class CollectionConfigurationStore(ConfigurationStore):
             newobj = self._createNewItem(config, section)
             if newobj.__class__ is not obj.__class__:
                 # Yeah, class have changed, let's replace the item
-                del self.context[name]
+                self.delete(name)
                 obj = newobj
                 existing = False
 
