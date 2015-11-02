@@ -380,7 +380,7 @@ class BoolFieldSerializer(FieldSerializer):
         return str(value)
 
     def deserializeValue(self, value):
-        return value == 'True'
+        return value in ('True', 'true')
 
 
 @zope.component.adapter(
