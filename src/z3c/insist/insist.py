@@ -131,6 +131,12 @@ class CollectionConfigurationStore(ConfigurationStore):
        * item_factory_typed(config, section)
     """
 
+    # Flag, indicating that this configuration store can properly support
+    # syncing without reloading all objects. To support syncing store has to
+    # implement `getConfigHash` method. Change in the hash indicates that child
+    # has to be reloaded.
+    supports_sync = True
+
     def selectSections(self, sections):
         """Return relevant sections from config
         """
@@ -157,6 +163,11 @@ class CollectionConfigurationStore(ConfigurationStore):
         return config
 
     def load(self, config):
+        if not self.supports_sync:
+            # No sync support, just delete all the items
+            for k in self.context.keys():
+                self.delete(k)
+
         unloaded = set(self.context.keys())
         for section in self.selectSections(config.sections()):
             loaded = self.loadFromSection(config, section)
@@ -165,10 +176,10 @@ class CollectionConfigurationStore(ConfigurationStore):
 
         # Remove any unloaded items from collection
         for k in unloaded:
-            del self.context[k]
+            self.delete(k)
 
-    def getSectionHash(self, obj, config, section):
-        return hash(tuple(config.items(section)))
+    def delete(self, key):
+        del self.context[key]
 
     def _createNewItem(self, config, section):
         if hasattr(self, 'item_factory_typed'):
