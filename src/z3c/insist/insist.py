@@ -202,7 +202,7 @@ class CollectionConfigurationStore(ConfigurationStore):
 
         log.info("Insist collection loading status for '%s': "
                  "%s reloaded, %s added, %s deleted",
-                 self.section_prefix,
+                 self.schema,
                  self._reloaded, self._added, self._deleted)
 
     def delete(self, key):
