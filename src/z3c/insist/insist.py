@@ -21,8 +21,6 @@ from z3c.insist import interfaces
 log = logging.getLogger(__name__)
 
 
-NONE_MARKER = '!None'
-
 @zope.interface.implementer(interfaces.IConfigurationStore)
 class ConfigurationStore(object):
 
@@ -165,6 +163,7 @@ class CollectionConfigurationStore(ConfigurationStore):
     def dump(self, config=None):
         if config is None:
             config = ConfigParser.RawConfigParser()
+            config.optionxform = str
         for k, v in self.context.items():
             __traceback_info__ = (k, v)
             store = interfaces.IConfigurationStore(v)
@@ -292,7 +291,6 @@ class CollectionConfigurationStore(ConfigurationStore):
 @zope.interface.implementer(interfaces.IFieldSerializer)
 class FieldSerializer(object):
     escape = '!'
-    none_marker = NONE_MARKER
 
     def __init__(self, field, context):
         self.field = field
@@ -305,13 +303,13 @@ class FieldSerializer(object):
     def serialize(self):
         value = getattr(self.context, self.field.__name__)
         if value is None:
-            return self.none_marker
+            return interfaces.NONE_MARKER
         else:
             result = self.serializeValue(value)
             return result.replace(self.escape, self.escape * 2)
 
     def deserialize(self, value):
-        if value == self.none_marker:
+        if value == interfaces.NONE_MARKER:
             decoded = None
         else:
             value = value.replace(self.escape * 2, self.escape)
@@ -452,25 +450,29 @@ class SequenceFieldSerializer(FieldSerializer):
 
     sequence = None
     separator = ", "
+    __item_serializer = None
+
+    @property
+    def _item_serializer(self):
+        if self.__item_serializer is None:
+            self.__item_serializer = zope.component.getMultiAdapter(
+            (self.field.value_type, self.context), interfaces.IFieldSerializer)
+        return self.__item_serializer
 
     def serializeValue(self, value):
-        item_serializer = zope.component.getMultiAdapter(
-            (self.field.value_type, self.context), interfaces.IFieldSerializer)
         results = []
         for item in value:
-            results.append(item_serializer.serializeValue(item))
+            results.append(self._item_serializer.serializeValue(item))
         return self.separator.join(results)
 
     def deserializeValue(self, value):
         if value == '':
             return self.sequence()
-        item_serializer = zope.component.getMultiAdapter(
-            (self.field.value_type, self.context), interfaces.IFieldSerializer)
         results = []
         for item in value.split(self.separator):
             __traceback_info__ = item, self.field.value_type
             item = item.strip()
-            results.append(item_serializer.deserializeValue(item))
+            results.append(self._item_serializer.deserializeValue(item))
         return self.sequence(results)
 
 

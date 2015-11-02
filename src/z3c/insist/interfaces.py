@@ -9,6 +9,8 @@ import zope.interface
 from zope.lifecycleevent import ObjectModifiedEvent
 from zope.lifecycleevent.interfaces import IObjectModifiedEvent
 
+NONE_MARKER = '!None'
+
 
 class IConfigurationStore(zope.interface.Interface):
 
