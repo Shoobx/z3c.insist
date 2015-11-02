@@ -341,25 +341,29 @@ class SequenceFieldSerializer(FieldSerializer):
 
     sequence = None
     separator = ", "
+    __item_serializer = None
+
+    @property
+    def _item_serializer(self):
+        if self.__item_serializer is None:
+            self.__item_serializer = zope.component.getMultiAdapter(
+            (self.field.value_type, self.context), interfaces.IFieldSerializer)
+        return self.__item_serializer
 
     def serializeValue(self, value):
-        item_serializer = zope.component.getMultiAdapter(
-            (self.field.value_type, self.context), interfaces.IFieldSerializer)
         results = []
         for item in value:
-            results.append(item_serializer.serializeValue(item))
+            results.append(self._item_serializer.serializeValue(item))
         return self.separator.join(results)
 
     def deserializeValue(self, value):
         if value == '':
             return self.sequence()
-        item_serializer = zope.component.getMultiAdapter(
-            (self.field.value_type, self.context), interfaces.IFieldSerializer)
         results = []
         for item in value.split(self.separator):
             __traceback_info__ = item, self.field.value_type
             item = item.strip()
-            results.append(item_serializer.deserializeValue(item))
+            results.append(self._item_serializer.deserializeValue(item))
         return self.sequence(results)
 
 
