@@ -17,6 +17,8 @@ from zope.schema import vocabulary
 from z3c.insist import interfaces
 
 
+NONE_MARKER = '!None'
+
 @zope.interface.implementer(interfaces.IConfigurationStore)
 class ConfigurationStore(object):
 
@@ -240,7 +242,7 @@ class CollectionConfigurationStore(ConfigurationStore):
 @zope.interface.implementer(interfaces.IFieldSerializer)
 class FieldSerializer(object):
     escape = '!'
-    none_marker = '!None'
+    none_marker = NONE_MARKER
 
     def __init__(self, field, context):
         self.field = field
