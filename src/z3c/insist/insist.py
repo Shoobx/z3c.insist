@@ -135,6 +135,8 @@ class CollectionConfigurationStore(ConfigurationStore):
        * item_factory_typed(config, section)
     """
 
+    schema = None
+
     # Flag, indicating that this configuration store can properly support
     # syncing without reloading all objects. To support syncing store has to
     # implement `getConfigHash` method. Change in the hash indicates that child
