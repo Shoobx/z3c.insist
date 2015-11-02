@@ -194,6 +194,12 @@ class CollectionConfigurationStore(ConfigurationStore):
         store.root = self.root
         return store
 
+    def getSectionHash(self, config, section):
+        return hash(tuple(config.items(section)))
+
+    def getChildConfigHash(self, obj, config, section):
+        return self.getSectionHash(config, section)
+
     def loadFromSection(self, config, section):
         """Load object from section and return name of the loaded object
 
@@ -213,7 +219,7 @@ class CollectionConfigurationStore(ConfigurationStore):
             obj = self._createNewItem(config, section)
 
         # Find the store object, that will handle loading
-        confhash = self.getSectionHash(obj, config, section)
+        confhash = self.getChildConfigHash(obj, config, section)
 
         # Check if configuration has changed
         if getattr(obj, "__insist_hash__", None) == confhash:
