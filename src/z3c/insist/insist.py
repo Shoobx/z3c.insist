@@ -18,6 +18,20 @@ from zope.schema import vocabulary
 
 from z3c.insist import interfaces
 
+class FilesystemMixin(object):
+    """Hooks to abstract file access."""
+
+    def fileExists(self, path):
+        return os.path.exists(path)
+
+    def getFileModTime(self, path):
+        if not self.fileExists(path):
+            return None
+        return os.path.getmtime(path)
+
+    def openFile(self, path, mode='r'):
+        return open(path, mode)
+
 
 @zope.interface.implementer(interfaces.IConfigurationStore)
 class ConfigurationStore(object):
@@ -243,7 +257,7 @@ class CollectionConfigurationStore(ConfigurationStore):
 
 
 @zope.interface.implementer(interfaces.ISeparateFileConfigurationStore)
-class SeparateFileConfigurationStoreMixIn(object):
+class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
     allowMainConfigLoad = True
     dumpSectionStub = True
     subConfig = None
@@ -265,7 +279,7 @@ class SeparateFileConfigurationStoreMixIn(object):
         # 1.2. Dump the config in a file.
         configFilename = self.getConfigFilename()
         configPath = os.path.join(self.getConfigPath(), configFilename)
-        with open(configPath, 'w') as file:
+        with self.openFile(configPath, 'w') as file:
             subconfig.write(file)
 
         # 2. Store a reference to the cofniguration file in the main
@@ -291,7 +305,7 @@ class SeparateFileConfigurationStoreMixIn(object):
         # 2. Create a new sub-config object and load the data.
         if self.subConfig is not None:
             pass
-        elif not os.path.exists(configPath):
+        elif not self.fileExists(configPath):
             if not self.allowMainConfigLoad:
                 raise ValueError(
                     'Configuration file does not exist: %s' % configPath)
@@ -300,7 +314,7 @@ class SeparateFileConfigurationStoreMixIn(object):
             self.subConfig = config
         else:
             self.subConfig = self._createConfigParser()
-            with open(configPath, 'r') as fle:
+            with self.openFile(configPath, 'r') as fle:
                 self.subConfig.readfp(fle)
 
         # 3. Load as usual from the sub-config.
@@ -314,7 +328,8 @@ class SeparateFileCollectionConfigurationStore(
         SeparateFileConfigurationStoreMixIn, CollectionConfigurationStore):
     pass
 
-class FileSectionsCollectionConfigurationStore(CollectionConfigurationStore):
+class FileSectionsCollectionConfigurationStore(
+        CollectionConfigurationStore, FilesystemMixin):
     """File Section Configuration Store
 
     These are collection stores that look for sections in other files. A base
@@ -358,11 +373,10 @@ class FileSectionsCollectionConfigurationStore(CollectionConfigurationStore):
         return super(FileSectionsCollectionConfigurationStore, self)\
           .selectSections(sections)
 
-
     def getConfigForSection(self, section):
         if section not in self.section_configs:
             config = self._createConfigParser()
-            with open(self.getSectionPath(section), 'r') as file:
+            with self.openFile(self.getSectionPath(section), 'r') as file:
                 config.readfp(file)
             self.section_configs[section] = config
         return self.section_configs[section]
@@ -370,10 +384,8 @@ class FileSectionsCollectionConfigurationStore(CollectionConfigurationStore):
     def getSectionHash(self, obj, config, section):
         # 1. Generate the config file path.
         sectionPath = self.getSectionPath(section)
-        # 2. Us the mod time of the file as a hash
-        if not os.path.exists(sectionPath):
-            return None
-        return os.path.getmtime(sectionPath)
+        # 2. Use the mod time of the file as a hash
+        return self.getFileModTime(sectionPath)
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
