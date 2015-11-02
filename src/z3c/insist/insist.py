@@ -290,21 +290,21 @@ class SeparateFileConfigurationStoreMixIn(object):
 
         # 2. Create a new sub-config object and load the data.
         if self.subConfig is not None:
-            subconfig = self.subConfig
+            pass
         elif not os.path.exists(configPath):
             if not self.allowMainConfigLoad:
                 raise ValueError(
                     'Configuration file does not exist: %s' % configPath)
             # Assume that the configuration is part of the main config. This
             # allows for controlled migration.
-            subconfig = config
+            self.subConfig = config
         else:
-            subconfig = self._createConfigParser()
+            self.subConfig = self._createConfigParser()
             with open(configPath, 'r') as fle:
-                subconfig.readfp(fle)
+                self.subConfig.readfp(fle)
 
         # 3. Load as usual from the sub-config.
-        self._loadSubConfig(subconfig)
+        self._loadSubConfig(self.subConfig)
 
 class SeparateFileConfigurationStore(
         SeparateFileConfigurationStoreMixIn, ConfigurationStore):
