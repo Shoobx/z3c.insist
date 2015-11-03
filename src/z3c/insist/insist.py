@@ -190,7 +190,7 @@ class CollectionConfigurationStore(ConfigurationStore):
 
         # Remove any unloaded items from collection
         for k in unloaded:
-            del self.context[k]
+            self.deleteItem(k)
 
     def getSectionHash(self, obj, config, section):
         return hash(tuple(config.items(section)))
