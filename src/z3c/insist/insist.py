@@ -21,6 +21,9 @@ from z3c.insist import interfaces
 class FilesystemMixin(object):
     """Hooks to abstract file access."""
 
+    def listDir(self, path):
+        return os.listdir(path)
+
     def fileExists(self, path):
         return os.path.exists(path)
 
@@ -364,7 +367,7 @@ class FileSectionsCollectionConfigurationStore(
         baseDir = self.getConfigPath()
         file_sections = [
             filename[:-len(self.filePostfix)]
-            for filename in os.listdir(baseDir)
+            for filename in self.listDir(baseDir)
             if (filename.startswith(self.section_prefix) and
                 filename.endswith(self.filePostfix))]
         if file_sections:
