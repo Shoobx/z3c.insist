@@ -38,12 +38,17 @@ setup(
     include_package_data=True,
     zip_safe=False,
     extras_require=dict(
-        test=['zope.testing',
-              'coverage',
-              'python-subunit',
-              'junitxml',
-              'pytz',
-              ],),
+        test=[
+            'zope.testing',
+            'coverage',
+            'python-subunit',
+            'junitxml',
+            'pytz',
+            ],
+        enforce=[
+            'watchdog',
+            ],
+        ),
     install_requires=[
         'setuptools',
         'zope.schema',
@@ -54,6 +59,7 @@ setup(
     entry_points={
         'console_scripts': [
             'perftest = z3c.insist.perftest:main',
+            'enftest = z3c.insist.enftest:main',
             ],
         }
 )

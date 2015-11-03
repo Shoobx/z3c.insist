@@ -60,6 +60,10 @@ class ISeparateFileConfigurationStore(IConfigurationStore):
         """Return the config filename."""
 
 
+class IConfigurationStoreEventHandler(zope.interface.Interface):
+    """Configuration Store Event Handler for Watchdog Observer"""
+
+
 class IFieldSerializer(zope.interface.Interface):
     """Serializer for a particular field type.
 

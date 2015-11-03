@@ -163,6 +163,9 @@ class CollectionConfigurationStore(ConfigurationStore):
     def addItem(self, name, obj):
         self.context[name] = obj
 
+    def deleteItem(self, name):
+        del self.context[name]
+
     def _createItemConfigStore(self, obj, config, section):
         store = interfaces.IConfigurationStore(obj)
         store.section = section
