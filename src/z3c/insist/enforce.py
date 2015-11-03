@@ -71,6 +71,65 @@ class FileSectionsCollectionConfigurationStoreEventHandler(
         logger.debug('Event completed in %.1fms.', (time.time()-ts)*1000)
 
 
+@zope.interface.implementer(interfaces.IConfigurationStoreEventHandler)
+@zope.component.adapter(zope.interface.Interface)
+class SeparateFileCollectionConfigurationStoreEventHandler(
+        watchdog.events.PatternMatchingEventHandler):
+    storeFactory = None
+
+    def __init__(self, context):
+        self.context = context
+        super(SeparateFileCollectionConfigurationStoreEventHandler, self)\
+          .__init__(
+            patterns=self.getFilePatterns(),
+            ignore_patterns=['*/.#*.*'])
+
+    def getFilePatterns(self):
+        return ['*/%s.ini' % self.storeFactory.section,
+                '*/%s*.*' % self.storeFactory.section_prefix]
+
+    def getSectionFromFilename(self, filename):
+        return filename.rsplit('.', 1)[0]
+
+    def createStore(self, section):
+        raise NotImplemented()
+
+    def on_modified(self, event):
+        filename = os.path.split(event.src_path)[-1]
+        logger.info('File modified: %s (%s)', filename, self.__class__.__name__)
+        ts = time.time()
+        section = self.getSectionFromFilename(filename)
+        store = self.createStore(section)
+        config = store._createConfigParser()
+        store.load(config)
+        logger.debug('Event completed in %.1fms.', (time.time()-ts)*1000)
+
+    def on_created(self, event):
+        filename = os.path.split(event.src_path)[-1]
+        logger.info('File created: %s (%s)', filename, self.__class__.__name__)
+        ts = time.time()
+        section = self.getSectionFromFilename(filename)
+        store = self.createStore(section)
+        config = store._createConfigParser()
+        store.load(config)
+        logger.debug('Event completed in %.1fms.', (time.time()-ts)*1000)
+
+    def on_deleted(self, event):
+        filename = os.path.split(event.src_path)[-1]
+        logger.info('File deleted: %s (%s)', filename, self.__class__.__name__)
+        ts = time.time()
+        section = self.getSectionFromFilename(filename)
+        store = self.createStore(section)
+        name = section.replace(store.section_prefix, '')
+        # Interestingly enough, load() will take care of business, since it
+        # looks for the config file and if it cannot find it will use the
+        # passed in config object. If that config object is empty, load will
+        # simply remove all items.
+        config = store._createConfigParser()
+        store.load(config)
+        logger.debug('Event completed in %.1fms.', (time.time()-ts)*1000)
+
+
 class Enforcer(object):
     """Detects configuration changes and applies them."""
 
