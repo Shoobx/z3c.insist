@@ -43,6 +43,7 @@ setup(
             'coverage',
             'python-subunit',
             'junitxml',
+            'mock',
             'pytz',
             ],
         enforce=[

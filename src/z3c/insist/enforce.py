@@ -3,7 +3,8 @@
 # Copyright 2015 by Shoobx, Inc.
 #
 ###############################################################################
-"""Module implementing a file listener to config changes."""
+"""Module implementing a file listener to config changes.
+"""
 import logging
 import os
 import time
@@ -33,7 +34,8 @@ class FileSectionsCollectionConfigurationStoreEventHandler(
         return ['*/%s*.*' % self.storeFactory.section_prefix]
 
     def getSectionFromFilename(self, filename):
-        return filename.rsplit('.', 1)[0]
+        # Limitation. Assume that the section does not have any "." in it.
+        return filename.split('.', 1)[0]
 
     def createStore(self, section):
         raise NotImplemented()

@@ -682,7 +682,8 @@ def test_suite():
                  doctest.REPORT_NDIFF|
                  doctest.ELLIPSIS)
     files = doctest.DocFileSuite(
-        'insist.txt', setUp=setUp, tearDown=tearDown, optionflags=optionflags)
+        '../insist.txt',
+        setUp=setUp, tearDown=tearDown, optionflags=optionflags)
     tests = doctest.DocTestSuite(
         setUp=setUp, tearDown=tearDown, optionflags=optionflags)
 

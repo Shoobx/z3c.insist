@@ -6,6 +6,7 @@
 """z3c.insist -- Persistence to ini files"""
 
 import zope.interface
+import zope.schema
 from zope.lifecycleevent import ObjectModifiedEvent
 from zope.lifecycleevent.interfaces import IObjectModifiedEvent
 
