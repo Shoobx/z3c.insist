@@ -7,6 +7,7 @@
 import datetime
 import decimal
 import ConfigParser
+import logging
 from cStringIO import StringIO
 
 import iso8601
@@ -15,6 +16,9 @@ import zope.component
 from zope.schema import vocabulary
 
 from z3c.insist import interfaces
+
+
+log = logging.getLogger(__name__)
 
 
 @zope.interface.implementer(interfaces.IConfigurationStore)
@@ -129,6 +133,18 @@ class CollectionConfigurationStore(ConfigurationStore):
        * item_factory_typed(config, section)
     """
 
+    schema = None
+
+    # Flag, indicating that this configuration store can properly support
+    # syncing without reloading all objects. To support syncing store has to
+    # implement `getConfigHash` method. Change in the hash indicates that child
+    # has to be reloaded.
+    supports_sync = True
+
+    _deleted = 0
+    _added = 0
+    _reloaded = 0
+
     def selectSections(self, sections):
         """Return relevant sections from config
         """
@@ -141,6 +157,7 @@ class CollectionConfigurationStore(ConfigurationStore):
         return section[len(self.section_prefix):]
 
     def addItem(self, name, obj):
+        self._added += 1
         self.context[name] = obj
 
     def dump(self, config=None):
@@ -156,27 +173,119 @@ class CollectionConfigurationStore(ConfigurationStore):
         return config
 
     def load(self, config):
-        for k in list(self.context):
-            del self.context[k]
+        self._deleted = 0
+        self._added = 0
+        self._reloaded = 0
 
+        if not self.supports_sync:
+            # No sync support, just delete all the items
+            for k in self.context.keys():
+                self.delete(k)
+
+        unloaded = set(self.context.keys())
         for section in self.selectSections(config.sections()):
-            self.loadFromSection(config, section)
+            loaded = self.loadFromSection(config, section)
+            if loaded in unloaded:
+                unloaded.remove(loaded)
 
-    def loadFromSection(self, config, section):
+        # Remove any unloaded items from collection
+        for k in unloaded:
+            self.delete(k)
+
+        self._logStatus()
+
+    def _logStatus(self):
+        if not self.supports_sync:
+            return
+
+        if not self._deleted and not self._added and not self._reloaded:
+            return
+
+        log.info("Insist collection loading status for '%s': "
+                 "%s reloaded, %s added, %s deleted",
+                 self.schema,
+                 self._reloaded, self._added, self._deleted)
+
+    def delete(self, key):
+        self._deleted += 1
+        del self.context[key]
+
+    def _createNewItem(self, config, section):
         if hasattr(self, 'item_factory_typed'):
             obj = self.item_factory_typed(config, section)
         else:
             obj = self.item_factory()
+        return obj
+
+    def _createItemConfigStore(self, obj, config, section):
         store = interfaces.IConfigurationStore(obj)
         store.section = section
         store.root = self.root
-        store.load(config)
+        return store
+
+    def getSectionHash(self, config, section):
+        return hash(tuple(config.items(section)))
+
+    def getChildConfigHash(self, obj, config, section):
+        return self.getSectionHash(config, section)
+
+    def loadFromSection(self, config, section):
+        """Load object from section and return name of the loaded object
+
+        After this function is completed, object with returned name should
+        exist in a collection and objects data should be up to date with
+        configuration.
+        """
         name = self.getItemName(config, section)
-        if hasattr(store, 'loadBeforeAdd'):
-            obj = store.loadBeforeAdd(name, config)
-        self.addItem(name, obj)
-        if hasattr(store, 'loadAfterAdd'):
-            store.loadAfterAdd(config)
+
+        existing = name in self.context
+
+        # Obtain the object we are loading. Find in collection or create new
+        # one.
+        if existing:
+            obj = self.context[name]
+        else:
+            obj = self._createNewItem(config, section)
+
+        # Find the store object, that will handle loading
+        confhash = self.getChildConfigHash(obj, config, section)
+
+        # Check if configuration has changed
+        if getattr(obj, "__insist_hash__", None) == confhash:
+            # Item did not change, skip it
+            return name
+
+        # Config has changed, we can load object with properties from
+        # configuration.
+
+        if existing:
+            self._reloaded += 1
+
+        # First of all, make sure class of the item didn't change. Otherwise we
+        # have to remove it and re-add, because property set for it may be
+        # completely different.
+        if existing:
+            newobj = self._createNewItem(config, section)
+            if newobj.__class__ is not obj.__class__:
+                # Yeah, class have changed, let's replace the item
+                self.delete(name)
+                obj = newobj
+                existing = False
+
+        # Now we can load properties into the object
+        store = self._createItemConfigStore(obj, config, section)
+        store.load(config)
+        obj.__insist_hash__ = confhash
+
+        if not existing:
+            # Let everyone know the object is being added to a collection
+            if hasattr(store, 'loadBeforeAdd'):
+                obj = store.loadBeforeAdd(name, config)
+            self.addItem(name, obj)
+            if hasattr(store, 'loadAfterAdd'):
+                store.loadAfterAdd(config)
+
+        return name
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
@@ -271,7 +380,7 @@ class BoolFieldSerializer(FieldSerializer):
         return str(value)
 
     def deserializeValue(self, value):
-        return value == 'True'
+        return value in ('True', 'true')
 
 
 @zope.component.adapter(
