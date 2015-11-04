@@ -38,7 +38,8 @@ class FilesystemMixin(object):
 
 @zope.interface.implementer(interfaces.IConfigurationStore)
 class ConfigurationStore(object):
-
+    """Base Configuration Store"""
+    file_header = None
     _section = None
     fields = None
     ignore_fields = None
@@ -66,6 +67,11 @@ class ConfigurationStore(object):
         if section is not None:
             store.section = section
         return store
+
+    def write(self, config, fileobj):
+        if self.file_header is not None:
+            fileobj.write(self.file_header + '\n')
+        config.write(fileobj)
 
     def _createConfigParser(self, config=None):
         if config is None:
@@ -105,7 +111,7 @@ class ConfigurationStore(object):
     def dumps(self):
         config = self.dump()
         buf = StringIO()
-        config.write(buf)
+        self.write(config, buf)
         return buf.getvalue()
 
     def load(self, config):
@@ -286,7 +292,7 @@ class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
         configFilename = self.getConfigFilename()
         configPath = os.path.join(self.getConfigPath(), configFilename)
         with self.openFile(configPath, 'w') as file:
-            subconfig.write(file)
+            self.write(subconfig, file)
 
         # 2. Store a reference to the cofniguration file in the main
         #    configuration object.

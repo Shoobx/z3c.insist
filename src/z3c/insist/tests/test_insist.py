@@ -169,6 +169,27 @@ def doctest_ConfigurationStore_section():
 
     """
 
+def doctest_ConfigurationStore_file_header():
+    """The configurations tore can also place a file header on top of the file.
+
+       >>> obj = NoneTestObject()
+       >>> store = insist.ConfigurationStore.makeStore(
+       ...     obj, INoneTestSchema, 'test')
+       >>> store.file_header = '# Nice file header\\n'
+
+    Nones and bangs get escaped:
+
+       >>> print store.dumps()
+       # Nice file header
+       <BLANKLINE>
+       [test]
+       test1 = !!None
+       test2 = !None
+       test3 = To infinity!! And beyond!!
+       test4 = !None
+
+    """
+
 def doctest_CollectionConfigurationStore():
     """Collection Configuration Store Tests
 
