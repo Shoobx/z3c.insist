@@ -11,17 +11,22 @@ import os
 import sys
 import time
 import zope.component
+import zope.interface
 from z3c.insist import insist, enforce, interfaces, perftest, testing
 
 
-class FileItemsCollectionStoreEventHandler(
-        enforce.FileSectionsCollectionConfigurationStoreEventHandler):
-    storeFactory = perftest.FileItemsCollectionStore
+class INumbers(zope.interface.Interface):
+    pass
 
-    def createStore(self, section):
-        store = self.storeFactory(self.context)
-        store.root = self.context
-        return store
+@zope.component.adapter(INumbers)
+class EnforcerFileItemsCollectionStore(
+        perftest.FileItemsCollectionStore,
+        enforce.EnforcerFileSectionsCollectionStore):
+
+    @classmethod
+    def fromRootAndFilename(cls, root, filename=None):
+        return cls(root)
+
 
 class EnforcerTest(object):
 
@@ -32,8 +37,7 @@ class EnforcerTest(object):
         zope.component.testing.setUp(None)
         testing.setUpSerializers()
         zope.component.provideAdapter(perftest.FileItemStore)
-        zope.component.provideSubscriptionAdapter(
-            FileItemsCollectionStoreEventHandler)
+        zope.component.provideAdapter(EnforcerFileItemsCollectionStore)
 
     def generateData(self):
         self.data = collections.OrderedDict()
@@ -66,8 +70,8 @@ class EnforcerTest(object):
         self.generateData()
         store = self.dumpData()
 
-        enforcer = enforce.EventHandlerSubscriberEnforcer(
-            perftest.DATA_DIRECTORY, self.data)
+        enforcer = enforce.Enforcer(perftest.DATA_DIRECTORY)
+        enforcer.register(enforce.EnforcerEventHandler(self.data))
         enforcer.start()
 
         try:
@@ -78,6 +82,7 @@ class EnforcerTest(object):
                     break
                 self.printItem(number)
         except KeyboardInterrupt:
+            enforcer.join()
             enforcer.stop()
 
 

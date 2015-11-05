@@ -12,6 +12,7 @@ import mock
 import unittest
 import watchdog.events
 import zope.component
+import zope.interface
 
 from z3c.insist import enforce, interfaces, testing
 
@@ -20,223 +21,128 @@ def doctest_Enforcer():
     r"""Base Enforcer Test
 
     We are using watchdog to listen for changed to the filesystem in a
-    particular directory. The first argument is the target directory and the
-    second one some context.
+    particular directory. The first argument is the target directory.
 
-      >>> enf = enforce.Enforcer('./', {})
-
-    Let's mock the actual watchdog observer, since we would need to start a
-    thread to use it properly.
-
-      >>> enf.observer = mock.Mock()
-      >>> enf.observer.schedule = mock.Mock()
+      >>> enf = enforce.Enforcer('./')
 
     To start with, we have to register at least one config store event handler.
 
-      >>> TestHandler = mock.Mock()
-      >>> enf.register(TestHandler)
+      >>> handler = mock.Mock()
+      >>> enf.schedule = mock.Mock()
+      >>> enf.register(handler)
 
-      >>> TestHandler.assert_called_with({})
-      >>> enf.observer.schedule.called
-      True
+      >>> enf.schedule.assert_called_with(handler, path='./', recursive=True)
 
-    Now that we have a handler, we can start the enforcer.
+    Now that we have a handler, we can start the enforcer. Note that enforcers
+    are just a small extension to watchdog observers, so the API is identical:
 
-      >>> enf.observer.start = mock.Mock()
+      >>> enf.start = lambda: None
       >>> enf.start()
-
-      >>> enf.observer.start.called
-      True
 
     At this point a thread would be started listening for inotify events. The
     thread can be shut down as follows:
 
-      >>> enf.observer.stop = mock.Mock()
+      >>> enf.stop = lambda: None
       >>> enf.stop()
-
-      >>> enf.observer.stop.called
-      True
     """
 
-def doctest_EventHandlerSubscriberEnforcer():
-    """Event Handler Subscriber Enforcer
+def doctest_EnforcerFileSectionsCollectionStore():
+    """Enforcer File Sections Collection Store Tests
 
-    This is a component architecture driven enforcer that looks up the event
-    handlers as subscribers to the context of the enforcer. Let me demonstrate.
+    This small mix-in class provides the necessary functions for a store to
+    work the enforcer. So let's say I have this simple store:
 
-    >>> TestHandler = mock.Mock()
-    >>> zope.component.provideSubscriptionAdapter(
-    ...     TestHandler,
-    ...     adapts=(None,),
-    ...     provides=interfaces.IConfigurationStoreEventHandler)
+    >>> class NumbersStore(enforce.EnforcerFileSectionsCollectionStore):
+    ...     section = 'numbers'
+    ...     section_prefix = 'number:'
 
-    >>> enf = enforce.EventHandlerSubscriberEnforcer('./', {})
-    >>> enf.observer = mock.Mock()
-    >>> enf.observer.schedule = mock.Mock()
+    We can now create the store and ask for the files to listen for:
 
-    >>> enf.start()
-    >>> TestHandler.called
-    True
-    >>> enf.observer.schedule.called
-    True
+    >>> store = NumbersStore()
+    >>> store.getFilePatterns()
+    ['*/numbers.ini', '*/number:*.*']
+
+    Once the event handler triggers, the store is instantiated using the
+    following API call, which must be implemented by sub-classes:
+
+    >>> root = {}
+    >>> NumbersStore.fromRootAndFilename(root, './number:1.ini')
+    Traceback (most recent call last):
+    ...
+    NotImplementedError: Create store from root and filename.
     """
 
-def doctest_FileSectionsCollectionConfigurationStoreEventHandler():
-    """File Sections Collection Configuration Store Event Handler Test
 
-    The file sections collection configuration store event handler is a
-    watchdog event handler written to handle changes to config files
-    controlled by file sections collection config stores. This event handler
-    is meant as a base class that is implemented for each store.
+def doctest_EnforcerEventHandler():
+    """Enforcer Event Handler
+
+    This event handler looks up all adapters registered to provide
+    `IConfigurationStore` and checks whether the factory support the
+    enforcer. If so, it adds the factory to its local registry of
+    participating stores.
 
     >>> config = mock.Mock()
-
     >>> store = mock.Mock()
     >>> store.section_prefix = 'number:'
     >>> store._createConfigParser = mock.Mock(return_value=config)
     >>> store.loadFromSection = mock.Mock()
     >>> store.deleteItem = mock.Mock()
 
-    >>> class MyHandler(
-    ...     enforce.FileSectionsCollectionConfigurationStoreEventHandler):
-    ...     storeFactory = mock.Mock(section_prefix='number:')
-    ...     createStore = mock.Mock(return_value=store)
+    >>> class NumbersStore(enforce.EnforcerFileSectionsCollectionStore):
+    ...     section = 'numbers'
+    ...     section_prefix = 'number:'
+    ...
+    ...     @classmethod
+    ...     def fromRootAndFilename(cls, root, filename=None):
+    ...         return cls()
+    ...
+    ...     _createConfigParser = mock.Mock(return_value=config)
+    ...     loadFromSection = mock.Mock()
+    ...     deleteItem = mock.Mock()
 
-    >>> handler = MyHandler({})
+    >>> zope.component.provideAdapter(
+    ...     NumbersStore, (zope.interface.Interface,),
+    ...     interfaces.IConfigurationStore)
 
-    There are some interesting hellper method that help identiying the files
-    to listen for:
+    >>> handler = enforce.EnforcerEventHandler({})
+    >>> handler.patternsToStoreFactoryMap
+    [(['*/numbers.ini', '*/number:*.*'],
+      <class 'z3c.insist.tests.test_enforce.NumbersStore'>)]
 
-    >>> handler.patterns
-    ['*/number:*.*']
-
-    >>> handler.ignore_patterns
-    ['*/.#*.*']
-
-    >>> handler.getFilePatterns()
-    ['*/number:*.*']
-
-    Note that `getFilePatterns()` is called in the constructor to create the
-    patterns attribute. If you need to cover more than the standard patterns,
-    you should consider overwriting the `getFilePatterns()` method.
-
-    There are also some methods that help identify the object name and config
-    section:
-
-    >>> handler.getSectionFromFilename('number:1.ini')
-    'number:1'
-    >>> handler.getSectionFromFilename('number:1.body.pt')
-    'number:1'
-
-    Let's now look at the watchdog event handler methods.
+    Let's now dispatch events to see how the store get's called:
 
     1. File Creation:
 
-    >>> store.reset_mock()
     >>> evt = watchdog.events.FileCreatedEvent('./path/number:1.ini')
-    >>> handler.on_created(evt)
+    >>> handler.dispatch(evt)
 
-    >>> store._createConfigParser.called
-    True
-    >>> store.loadFromSection.assert_called_with(config, 'number:1')
+    >>> NumbersStore.loadFromSection.assert_called_with(config, 'number:1')
 
     2. File Modification
 
-    >>> store.reset_mock()
+    >>> NumbersStore.loadFromSection.reset_mock()
     >>> evt = watchdog.events.FileModifiedEvent('./path/number:1.ini')
-    >>> handler.on_modified(evt)
+    >>> handler.dispatch(evt)
 
-    >>> store._createConfigParser.called
-    True
-    >>> store.loadFromSection.assert_called_with(config, 'number:1')
+    >>> NumbersStore.loadFromSection.assert_called_with(config, 'number:1')
 
     3. File Deletion
 
     >>> store.reset_mock()
     >>> evt = watchdog.events.FileDeletedEvent('./path/number:1.ini')
-    >>> handler.on_deleted(evt)
+    >>> handler.dispatch(evt)
 
-    >>> store.deleteItem.assert_called_with('1')
-    """
+    >>> NumbersStore.deleteItem.assert_called_with('1')
 
-def doctest_SeparateFileCollectionConfigurationStoreEventHandler():
-    """SeparateFile Collection Configuration Store Event Handler Test
+    If no store is found, we simply return and do nothing:
 
-    The separate file collection configuration store event handler is a
-    watchdog event handler written to handle changes to config files that
-    contain their entire config in a single file. This event handler
-    is meant as a base class that is implemented for each store.
+    >>> NumbersStore.loadFromSection.reset_mock()
+    >>> evt = watchdog.events.FileCreatedEvent('./path/int:1.ini')
+    >>> handler.dispatch(evt)
 
-    >>> config = mock.Mock()
+    >>> NumbersStore.loadFromSection.called
+    False
 
-    >>> store = mock.Mock()
-    >>> store.section = 'numbers'
-    >>> store.section_prefix = 'number:'
-    >>> store._createConfigParser = mock.Mock(return_value=config)
-    >>> store.loadFromSection = mock.Mock()
-    >>> store.deleteItem = mock.Mock()
-
-    >>> class MyHandler(
-    ...     enforce.SeparateFileCollectionConfigurationStoreEventHandler):
-    ...     storeFactory = mock.Mock(
-    ...         section_prefix='number:', section='numbers')
-    ...     createStore = mock.Mock(return_value=store)
-
-    >>> handler = MyHandler({})
-
-    There are some interesting hellper method that help identiying the files
-    to listen for:
-
-    >>> handler.patterns
-    ['*/numbers.ini', '*/number:*.*']
-
-    >>> handler.ignore_patterns
-    ['*/.#*.*']
-
-    >>> handler.getFilePatterns()
-    ['*/numbers.ini', '*/number:*.*']
-
-    Note that `getFilePatterns()` is called in the constructor to create the
-    patterns attribute. If you need to cover more than the standard patterns,
-    you should consider overwriting the `getFilePatterns()` method.
-
-    There are also some methods that help identify the object name and config
-    section:
-
-    >>> handler.getSectionFromFilename('numbers.ini')
-    'numbers'
-
-    Let's now look at the watchdog event handler methods.
-
-    1. File Creation:
-
-    >>> store.reset_mock()
-    >>> evt = watchdog.events.FileCreatedEvent('./path/numbers.ini')
-    >>> handler.on_created(evt)
-
-    >>> store._createConfigParser.called
-    True
-    >>> store.load.assert_called_with(config)
-
-    2. File Modification
-
-    >>> store.reset_mock()
-    >>> evt = watchdog.events.FileModifiedEvent('./path/numbers.ini')
-    >>> handler.on_modified(evt)
-
-    >>> store._createConfigParser.called
-    True
-    >>> store.load.assert_called_with(config)
-
-    3. File Deletion
-
-    >>> store.reset_mock()
-    >>> evt = watchdog.events.FileDeletedEvent('./path/numbers.ini')
-    >>> handler.on_deleted(evt)
-
-    >>> store._createConfigParser.called
-    True
-    >>> store.load.assert_called_with(config)
     """
 
 def setUp(test):

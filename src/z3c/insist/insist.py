@@ -46,7 +46,7 @@ class ConfigurationStore(object):
     ignore_missing = False
     root = None
 
-    def __init__(self, context):
+    def __init__(self, context=None):
         self.context = context
 
     @property
