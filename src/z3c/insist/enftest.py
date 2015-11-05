@@ -70,8 +70,8 @@ class EnforcerTest(object):
         self.generateData()
         store = self.dumpData()
 
-        enforcer = enforce.Enforcer(perftest.DATA_DIRECTORY)
-        enforcer.register(enforce.EnforcerEventHandler(self.data))
+        enforcer = enforce.Enforcer(perftest.DATA_DIRECTORY, self.data)
+        enforcer.registerHandlers()
         enforcer.start()
 
         try:
