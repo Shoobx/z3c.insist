@@ -67,7 +67,8 @@ class EnforcerEventHandler(watchdog.events.FileSystemEventHandler):
         event.store = store
         event.section = self.getSectionFromEvent(event)
         super(EnforcerEventHandler, self).dispatch(event)
-        logger.info('Configuration updated  in %.1fms.', (time.time()-ts)*1000)
+        logger.info('Configuration for %r updated in %.1fms.',
+                    store.root, (time.time()-ts)*1000)
         return True
 
     def on_modified(self, event):
