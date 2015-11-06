@@ -291,7 +291,6 @@ def doctest_SeparateFileEnforcerEventHandler():
     """
 
 
-
 def setUp(test):
     zope.component.testing.setUp(test)
     testing.setUpSerializers()
