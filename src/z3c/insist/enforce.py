@@ -163,14 +163,25 @@ class Enforcer(watchdog.observers.Observer):
             # limited use of watchdog.
             path = event.src_path
             if path in self.path2HandlerCache:
-                self.path2HandlerCache[path].dispatch(event)
+                try:
+                    self.path2HandlerCache[path].dispatch(event)
+                except Exception, err:
+                    # Handle all exceptions that happen whilel handling the
+                    # event and continue.
+                    logger.exception('Exception while handling event.')
                 return
             # To allow unschedule/stop and safe removal of event handlers
             # within event handlers itself, check if the handler is still
             # registered after every dispatch.
             for handler in list(self._handlers.get(watch, [])):
                 if handler in self._handlers.get(watch, []):
-                    handled = handler.dispatch(event)
+                    try:
+                        handled = handler.dispatch(event)
+                    except Exception, err:
+                        # Handle all exceptions that happen whilel handling the
+                        # event and continue.
+                        logger.exception('Exception while handling event.')
+                        handled = True
                     # Enforcer supports exactely one handler per file.
                     if handled:
                         self.path2HandlerCache[path] = handler
