@@ -43,6 +43,7 @@ def doctest_Enforcer():
     ...                    enforce.EnforcerFileSectionsCollectionStore):
     ...     section = 'numbers'
     ...     section_prefix = 'number:'
+
     >>> zope.component.provideAdapter(NumbersStore)
 
     >>> enf = enforce.Enforcer('./')
@@ -169,6 +170,7 @@ def doctest_FileSectionsEnforcerEventHandler():
     >>> class NumbersStore(enforce.EnforcerFileSectionsCollectionStore):
     ...     section = 'numbers'
     ...     section_prefix = 'number:'
+    ...     root = 'root'
     ...
     ...     @classmethod
     ...     def fromRootAndFilename(cls, root, filename=None):
@@ -235,6 +237,7 @@ def doctest_SeparateFileEnforcerEventHandler():
     >>> class NumbersStore(enforce.EnforcerFileSectionsCollectionStore):
     ...     section = 'numbers'
     ...     section_prefix = 'number:'
+    ...     root = 'root'
     ...
     ...     @classmethod
     ...     def fromRootAndFilename(cls, root, filename=None):
