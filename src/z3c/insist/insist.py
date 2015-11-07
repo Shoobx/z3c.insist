@@ -300,21 +300,27 @@ class FieldSerializer(object):
         value = getattr(self.context, self.field.__name__)
         return value is not self.field.missing_value
 
-    def serialize(self):
-        value = getattr(self.context, self.field.__name__)
+    def serializeValueWithNone(self, value):
         if value is None:
             return interfaces.NONE_MARKER
         else:
             result = self.serializeValue(value)
             return result.replace(self.escape, self.escape * 2)
 
-    def deserialize(self, value):
+    def serialize(self):
+        value = getattr(self.context, self.field.__name__)
+        return self.serializeValueWithNone(value)
+
+    def deserializeValueWithNone(self, value):
         if value == interfaces.NONE_MARKER:
-            decoded = None
+            return None
         else:
             value = value.replace(self.escape * 2, self.escape)
-            decoded = self.deserializeValue(value)
-        setattr(self.context, self.field.__name__, decoded)
+            return self.deserializeValue(value)
+
+    def deserialize(self, value):
+        setattr(self.context, self.field.__name__,
+                self.deserializeValueWithNone(value))
 
 
 @zope.component.adapter(
@@ -462,7 +468,7 @@ class SequenceFieldSerializer(FieldSerializer):
     def serializeValue(self, value):
         results = []
         for item in value:
-            results.append(self._item_serializer.serializeValue(item))
+            results.append(self._item_serializer.serializeValueWithNone(item))
         return self.separator.join(results)
 
     def deserializeValue(self, value):
@@ -472,7 +478,7 @@ class SequenceFieldSerializer(FieldSerializer):
         for item in value.split(self.separator):
             __traceback_info__ = item, self.field.value_type
             item = item.strip()
-            results.append(self._item_serializer.deserializeValue(item))
+            results.append(self._item_serializer.deserializeValueWithNone(item))
         return self.sequence(results)
 
 

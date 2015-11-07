@@ -356,6 +356,45 @@ def doctest_CollectionConfigStore_load_typed():
     """
 
 
+def doctest_ListFieldSerializer_edge_cases():
+    r"""
+    Tuple and list fields are serialized as multiline values.
+
+    Check that None gets serialized and can be read back
+
+        >>> class INumbers(zope.interface.Interface):
+        ...     numbers = zope.schema.List(
+        ...         value_type=zope.schema.Int())
+
+        >>> class Numbers(object):
+        ...     numbers = None
+
+        >>> nums = Numbers()
+        >>> nums.numbers = [42, None]
+        >>> store = insist.ConfigurationStore.makeStore(nums, INumbers, 'numbers')
+        >>> print store.dumps()
+        [numbers]
+        numbers = 42, !!None
+
+    Well it gets double escaped...
+    But it won't fail loading
+
+        >>> store.loads('''\
+        ... [numbers]
+        ... numbers = 42, !!None
+        ... ''')
+        >>> nums.numbers
+        [42, None]
+
+        >>> store.loads('''\
+        ... [numbers]
+        ... numbers =
+        ... ''')
+        >>> nums.numbers
+        []
+
+    """
+
 
 def setUp(test):
     zope.component.testing.setUp(test)
