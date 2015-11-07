@@ -400,6 +400,37 @@ def doctest_ListFieldSerializer_edge_cases():
         []
 
 
+    Check what happens when there's a delimiter in an item
+
+        >>> class ISomeTexts(zope.interface.Interface):
+        ...     sometexts = zope.schema.List(
+        ...         value_type=zope.schema.TextLine())
+
+        >>> class SomeTexts(object):
+        ...     sometexts = None
+
+        >>> texts = SomeTexts()
+        >>> texts.sometexts = [u'42', None, u', ', u'foo']
+        >>> store = insist.ConfigurationStore.makeStore(
+        ...     texts, ISomeTexts, 'sometexts')
+        >>> print store.dumps()
+        [sometexts]
+        sometexts = 42, !!None, , , foo
+
+        >>> store.loads('''\
+        ... [sometexts]
+        ... sometexts = 42, !!None, , , foo
+        ... ''')
+
+    oooooooooops, that u', ' we sent in is gone...
+    don't try this at home
+
+        >>> texts.sometexts
+        [u'42', None, u'', u'', u'foo']
+
+    """
+
+
 def doctest_DictFieldSerializer_edge_cases():
     r"""
     Dict fields get JSONified.
