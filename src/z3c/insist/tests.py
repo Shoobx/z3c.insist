@@ -2,6 +2,7 @@
 
 Test fixture.
 """
+import datetime
 import doctest
 import unittest
 import textwrap
@@ -112,6 +113,7 @@ def doctest_FieldSerializer_None():
 
     """
 
+
 def doctest_ConfigurationStore_load_missing_values():
     r"""Test that missing configuration values are handled fine.
 
@@ -150,6 +152,7 @@ def doctest_ConfigurationStore_section():
 
     """
 
+
 def doctest_CollectionConfigStore_dump():
     """
         Collections can be stored semi-automatically
@@ -177,6 +180,7 @@ def doctest_CollectionConfigStore_dump():
         salary = 30000
         male = False
     """
+
 
 def doctest_CollectionConfigStore_load_fresh():
     """ Load completely new collection
@@ -208,6 +212,7 @@ def doctest_CollectionConfigStore_load_fresh():
         {'jeb': <Person Jebediah Kerman, male, salary: 20000>,
          'val': <Person Valentina Kerman, female, salary: 30000>}
     """
+
 
 def doctest_CollectionConfigStore_load_changeaddremove():
     """ Add one item and remove another
@@ -296,6 +301,7 @@ def doctest_CollectionConfigStore_load_changeaddremove():
         >>> bill is coll['bill']
         True
     """
+
 
 def doctest_CollectionConfigStore_load_typed():
     """ Test collections with items of different types
@@ -392,6 +398,116 @@ def doctest_ListFieldSerializer_edge_cases():
         ... ''')
         >>> nums.numbers
         []
+
+
+def doctest_DictFieldSerializer_edge_cases():
+    r"""
+    Dict fields get JSONified.
+
+    Check what happens with None
+
+        >>> class IPerson(zope.interface.Interface):
+        ...     somedata = zope.schema.Dict(
+        ...         key_type=zope.schema.TextLine(),
+        ...         value_type=zope.schema.Int())
+
+        >>> class Person(object):
+        ...     somedata = None
+
+        >>> p = Person()
+        >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+
+        >>> p.somedata = None
+        >>> print store.dumps()
+        [person]
+        somedata = !None
+
+        >>> p.somedata = {u'foo': 42, u'bar': None}
+        >>> print store.dumps()
+        [person]
+        somedata = {
+              "foo": "42",
+              "bar": "!!None"
+            }
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = !None
+        ... ''')
+        >>> p.somedata is None
+        True
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = {}
+        ... ''')
+        >>> p.somedata
+        {}
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = {"foo": "42", "bar": "!!None"}
+        ... ''')
+        >>> p.somedata
+        {u'foo': 42, u'bar': None}
+
+    Date as value_type:
+
+        >>> class IPerson(zope.interface.Interface):
+        ...     somedata = zope.schema.Dict(
+        ...         key_type=zope.schema.TextLine(),
+        ...         value_type=zope.schema.Date())
+
+        >>> class Person(object):
+        ...     somedata = None
+
+        >>> p = Person()
+        >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+
+        >>> p.somedata = {u'foo': datetime.date(2015, 11, 7), u'bar': None}
+        >>> print store.dumps()
+        [person]
+        somedata = {
+              "foo": "2015-11-07",
+              "bar": "!!None"
+            }
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = !None
+        ... ''')
+        >>> p.somedata is None
+        True
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = {}
+        ... ''')
+        >>> p.somedata
+        {}
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = {"foo": "2014-05-23", "bar": "!!None"}
+        ... ''')
+        >>> p.somedata
+        {u'foo': datetime.date(2014, 5, 23), u'bar': None}
+
+
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = {"foo": "42", "bar": "!!None"}
+        ... ''')
+        Traceback (most recent call last):
+        ...
+        ValueError: time data '42' does not match format '%Y-%m-%d'
+
+
+        >>> p.somedata = {u'foo\u07d0': None}
+        >>> store.loads(store.dumps())
+        >>> p.somedata
+        {u'foo\u07d0': None}
 
     """
 

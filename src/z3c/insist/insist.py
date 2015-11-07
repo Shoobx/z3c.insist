@@ -7,6 +7,7 @@
 import datetime
 import decimal
 import ConfigParser
+import json
 import logging
 from cStringIO import StringIO
 
@@ -416,7 +417,7 @@ class DateTimeFieldSerializer(FieldSerializer):
         #   does not match format '%Y-%m-%dT%H:%M:%S.%f %Z'
         # and strptime isn't tops with timezones (does not support %z)
         #return dateutil.parser.parse(value)
-        
+
         return iso8601.parse_date(value)
 
 
@@ -508,3 +509,51 @@ class CustomSerializer(FieldSerializer):
 
     def deserializeValue(self, value):
         return getattr(self.store, 'load_' + self.field.__name__)(value)
+
+
+@zope.component.adapter(zope.schema.interfaces.IDict, zope.interface.Interface)
+class DictFieldSerializer(FieldSerializer):
+
+    factory = dict
+    __key_serializer = None
+    __value_serializer = None
+
+    @property
+    def _key_serializer(self):
+        if self.__key_serializer is None:
+            self.__key_serializer = zope.component.getMultiAdapter(
+            (self.field.key_type, self.context), interfaces.IFieldSerializer)
+        return self.__key_serializer
+
+    @property
+    def _value_serializer(self):
+        if self.__value_serializer is None:
+            self.__value_serializer = zope.component.getMultiAdapter(
+            (self.field.value_type, self.context), interfaces.IFieldSerializer)
+        return self.__value_serializer
+
+    def serializeValue(self, value):
+        results = {}
+        # serialize key and values with their serializers
+        # XXX: ordereddict will need a list, but that then does not look as {}
+        for key, val in value.items():
+            results[self._key_serializer.serializeValueWithNone(key)] = \
+                self._value_serializer.serializeValueWithNone(val)
+        # json dump the dict of {string: string} that will make native
+        # types like int quoted, but ohwell I don't want to write a parser
+        return json.dumps(results, indent=2)
+
+    def deserializeValue(self, value):
+        results = self.factory()
+        if value == '' or value == '{}':
+            return results
+        unser = json.loads(value)
+        for key, val in unser.items():
+            # str: we definitely sent utf-8 str in with serializeValue but json
+            #      will return unicode, some serializers don't like that
+            results[
+                self._key_serializer.deserializeValueWithNone(
+                    key.encode('utf8'))] = \
+                self._value_serializer.deserializeValueWithNone(
+                    val.encode('utf8'))
+        return results

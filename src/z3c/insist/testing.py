@@ -23,3 +23,4 @@ def setUpSerializers():
     zope.component.provideAdapter(insist.BoolFieldSerializer)
     zope.component.provideAdapter(insist.DateFieldSerializer)
     zope.component.provideAdapter(insist.DateTimeFieldSerializer)
+    zope.component.provideAdapter(insist.DictFieldSerializer)

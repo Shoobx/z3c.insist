@@ -287,3 +287,47 @@ Datetime fields get stringified.
     ... """)
     >>> foo.timestamp.isoformat()
     '2014-04-09T09:54:42.000132+01:00'
+
+Dict fields
+~~~~~~~~~~~
+
+Dict fields get JSONified.
+
+    >>> class IPerson(zope.interface.Interface):
+    ...     somedata = zope.schema.Dict(
+    ...         key_type=zope.schema.TextLine(),
+    ...         value_type=zope.schema.Int())
+
+    >>> class Person(object):
+    ...     somedata = None
+
+    >>> p = Person()
+    >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+
+    >>> p.somedata = {}
+    >>> print store.dumps()
+    [person]
+    somedata = {}
+
+    >>> p.somedata = {u'foo': 42}
+    >>> print store.dumps()
+    [person]
+    somedata = {
+          "foo": "42"
+        }
+
+    >>> store.loads("""\
+    ... [person]
+    ... somedata = {}
+    ... """)
+    >>> p.somedata
+    {}
+
+    >>> store.loads("""\
+    ... [person]
+    ... somedata = {
+    ...     "bar": "15"
+    ...     }
+    ... """)
+    >>> p.somedata
+    {u'bar': 15}
