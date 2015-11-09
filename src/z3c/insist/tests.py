@@ -401,7 +401,7 @@ def doctest_ListFieldSerializer_edge_cases():
         []
 
 
-    Check what happens when there's a delimiter in an item
+    Check what happens when there's a separator in an item
 
         >>> class ISomeTexts(zope.interface.Interface):
         ...     sometexts = zope.schema.List(
@@ -428,6 +428,32 @@ def doctest_ListFieldSerializer_edge_cases():
 
         >>> texts.sometexts
         [u'42', None, u'', u'', u'foo']
+
+
+    Let's see what happens is value_type is List
+
+        >>> class IPerson(zope.interface.Interface):
+        ...     somedata = zope.schema.List(
+        ...         value_type=zope.schema.Dict(
+        ...             key_type=zope.schema.TextLine(),
+        ...             value_type=zope.schema.TextLine()))
+
+        >>> class Person(object):
+        ...     somedata = None
+
+        >>> p = Person()
+        >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+
+        >>> p.somedata = [
+        ...     {u'first': u'foo'}, {u'second': u'bar', u'third': u'fun'}]
+        >>> print store.dumps()
+        [person]
+        somedata = first::foo, second::bar
+            third::fun
+
+        >>> store.loads(store.dumps())
+        >>> p.somedata
+        [{u'first': u'foo'}, {u'second': u'bar', u'third': u'fun'}]
 
     """
 
@@ -518,6 +544,18 @@ def doctest_DictFieldSerializer_edge_cases():
         ... ''')
         >>> p.somedata
         {u'bar': 42}
+
+    Separator in key_type or value_type fails
+    Choose your separator wisely
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata =
+        ...     ba::r::42
+        ... ''')
+        Traceback (most recent call last):
+        ...
+        ValueError: invalid literal for int() with base 10: 'r::42'
 
     OrderedDict as factory:
 
@@ -624,6 +662,29 @@ def doctest_DictFieldSerializer_edge_cases():
         >>> store.loads(store.dumps())
         >>> p.somedata
         {u'foo': u'first\nsecond\rthird\ta tab'}
+
+    Let's see what happens is value_type is List
+
+        >>> class IPerson(zope.interface.Interface):
+        ...     somedata = zope.schema.Dict(
+        ...         key_type=zope.schema.TextLine(),
+        ...         value_type=zope.schema.List(
+        ...             value_type=zope.schema.TextLine()))
+
+        >>> class Person(object):
+        ...     somedata = None
+
+        >>> p = Person()
+        >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+
+        >>> p.somedata = {u'foo': [u'first', u'second']}
+        >>> print store.dumps()
+        [person]
+        somedata = foo::first, second
+
+        >>> store.loads(store.dumps())
+        >>> p.somedata
+        {u'foo': [u'first', u'second']}
 
     """
 

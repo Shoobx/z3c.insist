@@ -515,7 +515,7 @@ class CustomSerializer(FieldSerializer):
 class DictFieldSerializer(FieldSerializer):
 
     factory = dict
-    delimiter = '::'
+    separator = '::'
     __key_serializer = None
     __value_serializer = None
 
@@ -554,7 +554,7 @@ class DictFieldSerializer(FieldSerializer):
             keySer = self._encodeString(keySer)
             valSer = self._value_serializer.serializeValueWithNone(val)
             valSer = self._encodeString(valSer)
-            resstr = '%s%s%s' % (keySer, self.delimiter, valSer)
+            resstr = '%s%s%s' % (keySer, self.separator, valSer)
             results.append(resstr)
         return '\n'.join(results)
 
@@ -566,7 +566,7 @@ class DictFieldSerializer(FieldSerializer):
         for line in lines:
             if not line:
                 continue
-            key, val = line.split(self.delimiter)
+            key, val = line.split(self.separator, 1)
             key = self._decodeString(key)
             val = self._decodeString(val)
             results[
