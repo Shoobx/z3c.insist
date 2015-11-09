@@ -515,6 +515,7 @@ class CustomSerializer(FieldSerializer):
 class DictFieldSerializer(FieldSerializer):
 
     factory = dict
+    delimiter = '::'
     __key_serializer = None
     __value_serializer = None
 
@@ -532,28 +533,43 @@ class DictFieldSerializer(FieldSerializer):
             (self.field.value_type, self.context), interfaces.IFieldSerializer)
         return self.__value_serializer
 
+    def _encodeString(self, value):
+        # drive string through json, to encode eventual \n and stuff
+        res = json.dumps(value)[1:-1]
+        return res
+
+    def _decodeString(self, value):
+        # drive string through json, to decode eventual \n and stuff
+        res = json.loads('"' + value + '"')
+        # encode: we definitely sent utf-8 str in with _encodeString but json
+        #         will return unicode, some serializers don't like that
+        return res.encode('utf8')
+
     def serializeValue(self, value):
-        results = {}
+        results = []
         # serialize key and values with their serializers
-        # XXX: ordereddict will need a list, but that then does not look as {}
+        # supports OrderedDict too, just need to override self.factory
         for key, val in value.items():
-            results[self._key_serializer.serializeValueWithNone(key)] = \
-                self._value_serializer.serializeValueWithNone(val)
-        # json dump the dict of {string: string} that will make native
-        # types like int quoted, but ohwell I don't want to write a parser
-        return json.dumps(results, indent=2)
+            keySer = self._key_serializer.serializeValueWithNone(key)
+            keySer = self._encodeString(keySer)
+            valSer = self._value_serializer.serializeValueWithNone(val)
+            valSer = self._encodeString(valSer)
+            resstr = '%s%s%s' % (keySer, self.delimiter, valSer)
+            results.append(resstr)
+        return '\n'.join(results)
 
     def deserializeValue(self, value):
         results = self.factory()
-        if value == '' or value == '{}':
+        if value == '':
             return results
-        unser = json.loads(value)
-        for key, val in unser.items():
-            # str: we definitely sent utf-8 str in with serializeValue but json
-            #      will return unicode, some serializers don't like that
+        lines = [line.strip() for line in value.splitlines()]
+        for line in lines:
+            if not line:
+                continue
+            key, val = line.split(self.delimiter)
+            key = self._decodeString(key)
+            val = self._decodeString(val)
             results[
-                self._key_serializer.deserializeValueWithNone(
-                    key.encode('utf8'))] = \
-                self._value_serializer.deserializeValueWithNone(
-                    val.encode('utf8'))
+                self._key_serializer.deserializeValueWithNone(key)] = \
+                self._value_serializer.deserializeValueWithNone(val)
         return results

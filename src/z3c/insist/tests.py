@@ -6,6 +6,7 @@ import datetime
 import doctest
 import unittest
 import textwrap
+from collections import OrderedDict
 
 import zope.interface
 import zope.component
@@ -453,13 +454,13 @@ def doctest_DictFieldSerializer_edge_cases():
         [person]
         somedata = !None
 
-        >>> p.somedata = {u'foo': 42, u'bar': None}
+        >>> p.somedata = OrderedDict([
+        ...     (u'foo', 42),
+        ...     (u'bar', None)])
         >>> print store.dumps()
         [person]
-        somedata = {
-              "foo": "42",
-              "bar": "!!None"
-            }
+        somedata = foo::42
+            bar::!!None
 
         >>> store.loads('''\
         ... [person]
@@ -470,17 +471,78 @@ def doctest_DictFieldSerializer_edge_cases():
 
         >>> store.loads('''\
         ... [person]
-        ... somedata = {}
+        ... somedata =
         ... ''')
         >>> p.somedata
         {}
 
+    None in value_type:
+
         >>> store.loads('''\
         ... [person]
-        ... somedata = {"foo": "42", "bar": "!!None"}
+        ... somedata = bar::15
+        ...     foo::!!None
+        ... ''')
+        >>> sorted(p.somedata.items())
+        [(u'bar', 15), (u'foo', None)]
+
+    Some weirdos:
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = {}
+        ... ''')
+        Traceback (most recent call last):
+        ...
+        ValueError: need more than 1 value to unpack
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = ::
+        ... ''')
+        Traceback (most recent call last):
+        ...
+        ValueError: invalid literal for int() with base 10: ''
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = ::42
         ... ''')
         >>> p.somedata
-        {u'foo': 42, u'bar': None}
+        {u'': 42}
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata =
+        ...     bar::42
+        ... ''')
+        >>> p.somedata
+        {u'bar': 42}
+
+    OrderedDict as factory:
+
+        >>> save_factory = insist.DictFieldSerializer.factory
+        >>> insist.DictFieldSerializer.factory = OrderedDict
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = bar::42
+        ...     foo::666
+        ... ''')
+
+        >>> p.somedata
+        OrderedDict([(u'bar', 42), (u'foo', 666)])
+
+        >>> store.loads('''\
+        ... [person]
+        ... somedata = foo::402
+        ...     bar::987
+        ... ''')
+
+        >>> p.somedata
+        OrderedDict([(u'foo', 402), (u'bar', 987)])
+
+        >>> insist.DictFieldSerializer.factory = save_factory
 
     Date as value_type:
 
@@ -498,10 +560,8 @@ def doctest_DictFieldSerializer_edge_cases():
         >>> p.somedata = {u'foo': datetime.date(2015, 11, 7), u'bar': None}
         >>> print store.dumps()
         [person]
-        somedata = {
-              "foo": "2015-11-07",
-              "bar": "!!None"
-            }
+        somedata = foo::2015-11-07
+            bar::!!None
 
         >>> store.loads('''\
         ... [person]
@@ -512,33 +572,58 @@ def doctest_DictFieldSerializer_edge_cases():
 
         >>> store.loads('''\
         ... [person]
-        ... somedata = {}
+        ... somedata =
         ... ''')
         >>> p.somedata
         {}
 
         >>> store.loads('''\
         ... [person]
-        ... somedata = {"foo": "2014-05-23", "bar": "!!None"}
+        ... somedata = foo::2015-11-07
+        ...     bar::!!None
         ... ''')
-        >>> p.somedata
-        {u'foo': datetime.date(2014, 5, 23), u'bar': None}
+        >>> sorted(p.somedata.items())
+        [(u'bar', None), (u'foo', datetime.date(2015, 11, 7))]
 
-
+    What happens when value_type does not conform?
 
         >>> store.loads('''\
         ... [person]
-        ... somedata = {"foo": "42", "bar": "!!None"}
+        ... somedata = foo::42
+        ...     bar::!!None
         ... ''')
         Traceback (most recent call last):
         ...
         ValueError: time data '42' does not match format '%Y-%m-%d'
 
+    Let's see that unicode strings survive dump and load
 
         >>> p.somedata = {u'foo\u07d0': None}
         >>> store.loads(store.dumps())
         >>> p.somedata
         {u'foo\u07d0': None}
+
+    Let's see that \n and friends survive load and dump
+
+        >>> class IPerson(zope.interface.Interface):
+        ...     somedata = zope.schema.Dict(
+        ...         key_type=zope.schema.TextLine(),
+        ...         value_type=zope.schema.Text())
+
+        >>> class Person(object):
+        ...     somedata = None
+
+        >>> p = Person()
+        >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+
+        >>> p.somedata = {u'foo': 'first\nsecond\rthird\ta tab'}
+        >>> print store.dumps()
+        [person]
+        somedata = foo::first\nsecond\rthird\ta tab
+
+        >>> store.loads(store.dumps())
+        >>> p.somedata
+        {u'foo': u'first\nsecond\rthird\ta tab'}
 
     """
 
