@@ -480,6 +480,25 @@ def doctest_FileSectionsCollectionConfigurationStore():
        {'one': Simple(u'Number 1'),
         'three': Simple(u'The tail.'),
         'two': Simple(u'Two is a charm')}
+
+    Also, the config hash of any item is determined by the mod time of all
+    files starting with that section name:
+
+       >>> orig_hash = store.getChildConfigHash(coll['one'], None, 'simple:one')
+
+       >>> info_fn = os.path.join(store.getConfigPath(), 'simple:one.info')
+       >>> with open(info_fn, 'w') as file:
+       ...     file.write('Info')
+       >>> new_hash = store.getChildConfigHash(coll['one'], None, 'simple:one')
+
+       >>> orig_hash == new_hash
+       False
+
+       >>> os.remove(info_fn)
+       >>> new_hash = store.getChildConfigHash(coll['one'], None, 'simple:one')
+
+       >>> orig_hash == new_hash
+       True
     """
 
 

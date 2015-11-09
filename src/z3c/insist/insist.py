@@ -441,10 +441,15 @@ class FileSectionsCollectionConfigurationStore(
         return self.section_configs[section]
 
     def getChildConfigHash(self, obj, config, section):
-        # 1. Generate the config file path.
-        sectionPath = self.getSectionPath(section)
-        # 2. Use the mod time of the file as a hash
-        return self.getFileModTime(sectionPath)
+        # With making the assumption that all object related config files
+        # start with section name + ".", we simply create the hash from the
+        # mod time of all files found.
+        configPath = self.getConfigPath()
+        return hash(tuple([
+            self.getFileModTime(os.path.join(configPath, fn))
+            for fn in self.listDir(configPath)
+            if fn.startswith(section+'.')
+            ]))
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
