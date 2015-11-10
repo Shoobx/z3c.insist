@@ -7,3 +7,5 @@ build/
 
 *.pyc
 src/*.egg-info
+
+perf-data/

@@ -6,6 +6,7 @@
 """z3c.insist -- Persistence to ini files"""
 
 import zope.interface
+import zope.schema
 from zope.lifecycleevent import ObjectModifiedEvent
 from zope.lifecycleevent.interfaces import IObjectModifiedEvent
 
@@ -40,6 +41,24 @@ class IConfigurationStore(zope.interface.Interface):
 
     def loads(config):
         """Load the object state from the configuration as a string."""
+
+
+class ISeparateFileConfigurationStore(IConfigurationStore):
+    """Collection Configuration Store Utilizing a Separate File
+
+    This is a configuration store for collections that stores all
+    configuration for the collection intoa  separate file.
+    """
+
+    def getConfigPath():
+        """Get configuration directory path.
+
+        Returns the path of the drirectory in which to store the configuration.
+        """
+        raise NotImplemented
+
+    def getConfigFilename():
+        """Return the config filename."""
 
 
 class IFieldSerializer(zope.interface.Interface):

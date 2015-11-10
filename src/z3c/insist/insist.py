@@ -1,14 +1,15 @@
 ###############################################################################
 #
-# Copyright 2013 by Shoobx, Inc.
+# Copyright 2013-15 by Shoobx, Inc.
 #
 ###############################################################################
 """z3c.insist -- Persistence to ini files"""
+import ConfigParser
 import datetime
 import decimal
-import ConfigParser
 import json
 import logging
+import os
 from cStringIO import StringIO
 
 import iso8601
@@ -19,19 +20,38 @@ from zope.schema import vocabulary
 from z3c.insist import interfaces
 
 
+class FilesystemMixin(object):
+    """Hooks to abstract file access."""
+
+    def listDir(self, path):
+        return os.listdir(path)
+
+    def fileExists(self, path):
+        return os.path.exists(path)
+
+    def getFileModTime(self, path):
+        if not self.fileExists(path):
+            return None
+        return os.path.getmtime(path)
+
+    def openFile(self, path, mode='r'):
+        return open(path, mode)
+
+
 log = logging.getLogger(__name__)
 
 
 @zope.interface.implementer(interfaces.IConfigurationStore)
 class ConfigurationStore(object):
-
+    """Base Configuration Store"""
+    file_header = None
     _section = None
     fields = None
     ignore_fields = None
     ignore_missing = False
     root = None
 
-    def __init__(self, context):
+    def __init__(self, context=None):
         self.context = context
 
     @property
@@ -52,6 +72,17 @@ class ConfigurationStore(object):
         if section is not None:
             store.section = section
         return store
+
+    def write(self, config, fileobj):
+        if self.file_header is not None:
+            fileobj.write(self.file_header + '\n')
+        config.write(fileobj)
+
+    def _createConfigParser(self, config=None):
+        if config is None:
+            config = ConfigParser.RawConfigParser()
+            config.optionxform = str
+        return config
 
     def _get_fields(self):
         """Returns a sequence of (name, field) pairs"""
@@ -78,16 +109,14 @@ class ConfigurationStore(object):
             config.set(self.section, fn, state)
 
     def dump(self, config=None):
-        if config is None:
-            config = ConfigParser.RawConfigParser()
-            config.optionxform = str
+        config = self._createConfigParser(config)
         self._dump(config)
         return config
 
     def dumps(self):
         config = self.dump()
         buf = StringIO()
-        config.write(buf)
+        self.write(config, buf)
         return buf.getvalue()
 
     def load(self, config):
@@ -115,7 +144,7 @@ class ConfigurationStore(object):
 
     def loads(self, cfgstr):
         buf = StringIO(cfgstr)
-        config = ConfigParser.RawConfigParser()
+        config = self._createConfigParser()
         config.readfp(buf)
         self.load(config)
 
@@ -161,15 +190,22 @@ class CollectionConfigurationStore(ConfigurationStore):
         self._added += 1
         self.context[name] = obj
 
+    def deleteItem(self, name):
+        self._deleted += 1
+        del self.context[name]
+
+    def _createItemConfigStore(self, obj, config, section):
+        store = interfaces.IConfigurationStore(obj)
+        store.section = section
+        store.root = self.root
+        return store
+
     def dump(self, config=None):
-        if config is None:
-            config = ConfigParser.RawConfigParser()
-            config.optionxform = str
+        config = self._createConfigParser(config)
         for k, v in self.context.items():
             __traceback_info__ = (k, v)
-            store = interfaces.IConfigurationStore(v)
-            store.section = self.section_prefix + unicode(k).encode('utf-8')
-            store.root = self.root
+            store = self._createItemConfigStore(
+                v, config, self.section_prefix + unicode(k).encode('utf-8'))
             store.dump(config)
         return config
 
@@ -181,7 +217,7 @@ class CollectionConfigurationStore(ConfigurationStore):
         if not self.supports_sync:
             # No sync support, just delete all the items
             for k in self.context.keys():
-                self.delete(k)
+                self.deleteItem(k)
 
         unloaded = set(self.context.keys())
         for section in self.selectSections(config.sections()):
@@ -191,7 +227,7 @@ class CollectionConfigurationStore(ConfigurationStore):
 
         # Remove any unloaded items from collection
         for k in unloaded:
-            self.delete(k)
+            self.deleteItem(k)
 
         self._logStatus()
 
@@ -207,22 +243,12 @@ class CollectionConfigurationStore(ConfigurationStore):
                  self.schema,
                  self._reloaded, self._added, self._deleted)
 
-    def delete(self, key):
-        self._deleted += 1
-        del self.context[key]
-
     def _createNewItem(self, config, section):
         if hasattr(self, 'item_factory_typed'):
             obj = self.item_factory_typed(config, section)
         else:
             obj = self.item_factory()
         return obj
-
-    def _createItemConfigStore(self, obj, config, section):
-        store = interfaces.IConfigurationStore(obj)
-        store.section = section
-        store.root = self.root
-        return store
 
     def getSectionHash(self, config, section):
         return hash(tuple(config.items(section)))
@@ -240,7 +266,6 @@ class CollectionConfigurationStore(ConfigurationStore):
         name = self.getItemName(config, section)
 
         existing = name in self.context
-
         # Obtain the object we are loading. Find in collection or create new
         # one.
         if existing:
@@ -251,9 +276,11 @@ class CollectionConfigurationStore(ConfigurationStore):
         # Find the store object, that will handle loading
         confhash = self.getChildConfigHash(obj, config, section)
 
-        # Check if configuration has changed
-        if getattr(obj, "__insist_hash__", None) == confhash:
-            # Item did not change, skip it
+        # Check if configuration has changed. Note that in some cases when the
+        # object is new, the hash might not have been computable and thus
+        # None. In those cases we want to go on.
+        if confhash is not None and \
+          getattr(obj, "__insist_hash__", None) == confhash:
             return name
 
         # Config has changed, we can load object with properties from
@@ -269,13 +296,14 @@ class CollectionConfigurationStore(ConfigurationStore):
             newobj = self._createNewItem(config, section)
             if newobj.__class__ is not obj.__class__:
                 # Yeah, class have changed, let's replace the item
-                self.delete(name)
+                self.deleteItem(name)
                 obj = newobj
                 existing = False
 
         # Now we can load properties into the object
         store = self._createItemConfigStore(obj, config, section)
         store.load(config)
+        # Set the confhash.
         obj.__insist_hash__ = confhash
 
         if not existing:
@@ -287,6 +315,141 @@ class CollectionConfigurationStore(ConfigurationStore):
                 store.loadAfterAdd(config)
 
         return name
+
+
+@zope.interface.implementer(interfaces.ISeparateFileConfigurationStore)
+class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
+    allowMainConfigLoad = True
+    dumpSectionStub = True
+    subConfig = None
+
+    def getConfigPath(self):
+        raise NotImplemented
+
+    def getConfigFilename(self):
+        return self.section + '.ini'
+
+    def _dumpSubConfig(self, config):
+        super(SeparateFileConfigurationStoreMixIn, self).dump(config)
+
+    def dump(self, config=None):
+        # 1. Store all items in a separate configuration file.
+        # 1.1. Create the config object and fill it.
+        subconfig = self._createConfigParser()
+        self._dumpSubConfig(subconfig)
+        # 1.2. Dump the config in a file.
+        configFilename = self.getConfigFilename()
+        configPath = os.path.join(self.getConfigPath(), configFilename)
+        with self.openFile(configPath, 'w') as file:
+            self.write(subconfig, file)
+
+        # 2. Store a reference to the cofniguration file in the main
+        #    configuration object.
+        # 2.1. Create the config object, if it does not exist.
+        config = self._createConfigParser(config)
+        # 2.2. Now dump the section stub in the original config object, if so
+        #      desired.
+        if self.dumpSectionStub:
+            config.add_section(self.section)
+            config.set(self.section, 'config-file', configFilename)
+
+        return config
+
+    def _loadSubConfig(self, config):
+        super(SeparateFileConfigurationStoreMixIn, self).load(config)
+
+    def load(self, config):
+        # 1. Generate the config file path.
+        configFilename = self.getConfigFilename()
+        configPath = os.path.join(self.getConfigPath(), configFilename)
+
+        # 2. Create a new sub-config object and load the data.
+        if self.subConfig is not None:
+            pass
+        elif not self.fileExists(configPath):
+            if not self.allowMainConfigLoad:
+                raise ValueError(
+                    'Configuration file does not exist: %s' % configPath)
+            # Assume that the configuration is part of the main config. This
+            # allows for controlled migration.
+            self.subConfig = config
+        else:
+            self.subConfig = self._createConfigParser()
+            with self.openFile(configPath, 'r') as fle:
+                self.subConfig.readfp(fle)
+
+        # 3. Load as usual from the sub-config.
+        self._loadSubConfig(self.subConfig)
+
+
+class SeparateFileConfigurationStore(
+        SeparateFileConfigurationStoreMixIn, ConfigurationStore):
+    pass
+
+
+class SeparateFileCollectionConfigurationStore(
+        SeparateFileConfigurationStoreMixIn, CollectionConfigurationStore):
+    pass
+
+
+class FileSectionsCollectionConfigurationStore(
+        CollectionConfigurationStore, FilesystemMixin):
+    """File Section Configuration Store
+
+    These are collection stores that look for sections in other files. A base
+    implementation is provided that assumes that the filenames and section
+    names are identical.
+    """
+    allowMainConfigLoad = True
+    filePostfix = '.ini'
+
+    def __init__(self, *args, **kw):
+        super(FileSectionsCollectionConfigurationStore, self).__init__(
+            *args, **kw)
+        # A cache, so that we need to read each config file at most once.
+        self.section_configs = {}
+
+    def _createItemConfigStore(self, obj, config, section):
+        store = super(FileSectionsCollectionConfigurationStore, self)\
+          ._createItemConfigStore(obj, config, section)
+        store.subConfig = self.section_configs.get(section)
+        return store
+
+    def getConfigPath(self):
+        raise NotImplemented
+
+    def getSectionPath(self, section):
+        return os.path.join(self.getConfigPath(), section + self.filePostfix)
+
+    def selectSections(self, sections):
+        baseDir = self.getConfigPath()
+        file_sections = [
+            filename[:-len(self.filePostfix)]
+            for filename in self.listDir(baseDir)
+            if (filename.startswith(self.section_prefix) and
+                filename.endswith(self.filePostfix))]
+        if file_sections:
+            return file_sections
+        # If we allow loading via main config file, let's use the usual way to
+        # lookup sections.
+        if not self.allowMainConfigLoad:
+            return []
+        return super(FileSectionsCollectionConfigurationStore, self)\
+          .selectSections(sections)
+
+    def getConfigForSection(self, section):
+        if section not in self.section_configs:
+            config = self._createConfigParser()
+            with self.openFile(self.getSectionPath(section), 'r') as file:
+                config.readfp(file)
+            self.section_configs[section] = config
+        return self.section_configs[section]
+
+    def getChildConfigHash(self, obj, config, section):
+        # 1. Generate the config file path.
+        sectionPath = self.getSectionPath(section)
+        # 2. Use the mod time of the file as a hash
+        return self.getFileModTime(sectionPath)
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
