@@ -7,6 +7,7 @@
 import ConfigParser
 import datetime
 import decimal
+import json
 import logging
 import os
 from cStringIO import StringIO
@@ -17,6 +18,7 @@ import zope.component
 from zope.schema import vocabulary
 
 from z3c.insist import interfaces
+
 
 class FilesystemMixin(object):
     """Hooks to abstract file access."""
@@ -379,13 +381,16 @@ class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
         # 3. Load as usual from the sub-config.
         self._loadSubConfig(self.subConfig)
 
+
 class SeparateFileConfigurationStore(
         SeparateFileConfigurationStoreMixIn, ConfigurationStore):
     pass
 
+
 class SeparateFileCollectionConfigurationStore(
         SeparateFileConfigurationStoreMixIn, CollectionConfigurationStore):
     pass
+
 
 class FileSectionsCollectionConfigurationStore(
         CollectionConfigurationStore, FilesystemMixin):
@@ -464,21 +469,27 @@ class FieldSerializer(object):
         value = getattr(self.context, self.field.__name__)
         return value is not self.field.missing_value
 
-    def serialize(self):
-        value = getattr(self.context, self.field.__name__)
+    def serializeValueWithNone(self, value):
         if value is None:
             return interfaces.NONE_MARKER
         else:
             result = self.serializeValue(value)
             return result.replace(self.escape, self.escape * 2)
 
-    def deserialize(self, value):
+    def serialize(self):
+        value = getattr(self.context, self.field.__name__)
+        return self.serializeValueWithNone(value)
+
+    def deserializeValueWithNone(self, value):
         if value == interfaces.NONE_MARKER:
-            decoded = None
+            return None
         else:
             value = value.replace(self.escape * 2, self.escape)
-            decoded = self.deserializeValue(value)
-        setattr(self.context, self.field.__name__, decoded)
+            return self.deserializeValue(value)
+
+    def deserialize(self, value):
+        setattr(self.context, self.field.__name__,
+                self.deserializeValueWithNone(value))
 
 
 @zope.component.adapter(
@@ -626,7 +637,7 @@ class SequenceFieldSerializer(FieldSerializer):
     def serializeValue(self, value):
         results = []
         for item in value:
-            results.append(self._item_serializer.serializeValue(item))
+            results.append(self._item_serializer.serializeValueWithNone(item))
         return self.separator.join(results)
 
     def deserializeValue(self, value):
@@ -636,7 +647,7 @@ class SequenceFieldSerializer(FieldSerializer):
         for item in value.split(self.separator):
             __traceback_info__ = item, self.field.value_type
             item = item.strip()
-            results.append(self._item_serializer.deserializeValue(item))
+            results.append(self._item_serializer.deserializeValueWithNone(item))
         return self.sequence(results)
 
 
@@ -666,3 +677,67 @@ class CustomSerializer(FieldSerializer):
 
     def deserializeValue(self, value):
         return getattr(self.store, 'load_' + self.field.__name__)(value)
+
+
+@zope.component.adapter(zope.schema.interfaces.IDict, zope.interface.Interface)
+class DictFieldSerializer(FieldSerializer):
+
+    factory = dict
+    separator = '::'
+    __key_serializer = None
+    __value_serializer = None
+
+    @property
+    def _key_serializer(self):
+        if self.__key_serializer is None:
+            self.__key_serializer = zope.component.getMultiAdapter(
+            (self.field.key_type, self.context), interfaces.IFieldSerializer)
+        return self.__key_serializer
+
+    @property
+    def _value_serializer(self):
+        if self.__value_serializer is None:
+            self.__value_serializer = zope.component.getMultiAdapter(
+            (self.field.value_type, self.context), interfaces.IFieldSerializer)
+        return self.__value_serializer
+
+    def _encodeString(self, value):
+        # drive string through json, to encode eventual \n and stuff
+        res = json.dumps(value)[1:-1]
+        return res
+
+    def _decodeString(self, value):
+        # drive string through json, to decode eventual \n and stuff
+        res = json.loads('"' + value + '"')
+        # encode: we definitely sent utf-8 str in with _encodeString but json
+        #         will return unicode, some serializers don't like that
+        return res.encode('utf8')
+
+    def serializeValue(self, value):
+        results = []
+        # serialize key and values with their serializers
+        # supports OrderedDict too, just need to override self.factory
+        for key, val in value.items():
+            keySer = self._key_serializer.serializeValueWithNone(key)
+            keySer = self._encodeString(keySer)
+            valSer = self._value_serializer.serializeValueWithNone(val)
+            valSer = self._encodeString(valSer)
+            resstr = '%s%s%s' % (keySer, self.separator, valSer)
+            results.append(resstr)
+        return '\n'.join(results)
+
+    def deserializeValue(self, value):
+        results = self.factory()
+        if value == '':
+            return results
+        lines = [line.strip() for line in value.splitlines()]
+        for line in lines:
+            if not line:
+                continue
+            key, val = line.split(self.separator, 1)
+            key = self._decodeString(key)
+            val = self._decodeString(val)
+            results[
+                self._key_serializer.deserializeValueWithNone(key)] = \
+                self._value_serializer.deserializeValueWithNone(val)
+        return results

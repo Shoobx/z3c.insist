@@ -287,3 +287,49 @@ Datetime fields get stringified.
     ... """)
     >>> foo.timestamp.isoformat()
     '2014-04-09T09:54:42.000132+01:00'
+
+Dict fields
+~~~~~~~~~~~
+
+Dict fields are serialized as multiline values.
+
+    >>> from collections import OrderedDict
+
+    >>> class IPerson(zope.interface.Interface):
+    ...     somedata = zope.schema.Dict(
+    ...         key_type=zope.schema.TextLine(),
+    ...         value_type=zope.schema.Int())
+
+    >>> class Person(object):
+    ...     somedata = None
+
+    >>> p = Person()
+    >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+
+    >>> p.somedata = {}
+    >>> print store.dumps()
+    [person]
+    somedata =
+
+    >>> p.somedata = OrderedDict((
+    ...     (u'foo', 42),
+    ...     (u'bar', 555)))
+    >>> print store.dumps()
+    [person]
+    somedata = foo::42
+      bar::555
+
+    >>> store.loads("""\
+    ... [person]
+    ... somedata =
+    ... """)
+    >>> p.somedata
+    {}
+
+    >>> store.loads("""\
+    ... [person]
+    ... somedata = bar::15
+    ...     foo::999
+    ... """)
+    >>> sorted(p.somedata.items())
+    [(u'bar', 15), (u'foo', 999)]

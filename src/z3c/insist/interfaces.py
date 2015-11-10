@@ -75,6 +75,23 @@ class IFieldSerializer(zope.interface.Interface):
     def deserialize(state):
         """Set the field value from a given serialized state"""
 
+# helper methods:
+    def serializeValueWithNone(value):
+        """return NONE_MARKER if value is None, otherwise escape
+        and call serializeValue
+        """
+
+    def serializeValue(value):
+        """the real native type -> string conversion happens here"""
+
+    def deserializeValueWithNone(value):
+        """return None if value is NONE_MARKER, otherwise de-escape
+        and call deserializeValue
+        """
+
+    def deserializeValue(value):
+        """the real string -> native type conversion happens here"""
+
 
 class IObjectConfigurationLoadedEvent(IObjectModifiedEvent):
     """Object configuration loaded event interface"""

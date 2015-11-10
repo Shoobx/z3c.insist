@@ -12,4 +12,5 @@
   <adapter factory=".insist.BoolFieldSerializer" />
   <adapter factory=".insist.DateFieldSerializer" />
   <adapter factory=".insist.DateTimeFieldSerializer" />
+  <adapter factory=".insist.DictFieldSerializer" />
 </configure>
