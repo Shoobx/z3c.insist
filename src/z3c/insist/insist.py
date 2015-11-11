@@ -404,12 +404,15 @@ class SeparateFileCollectionConfigurationStore(
         SeparateFileConfigurationStoreMixIn, CollectionConfigurationStore):
 
     def getChildConfigHash(self, obj, config, section):
+        ownhash = super(SeparateFileCollectionConfigurationStore, self). \
+            getChildConfigHash(obj, config, section)
         # With making the assumption that all object related config files
         # start with section name + ".", we simply create the hash from the
         # mod time of all files found.
         configPath = self.getConfigPath()
         pattern = os.path.join(configPath, "%s.*" % section)
-        return self.hashFilesByPattern(pattern)
+        fileshash = self.hashFilesByPattern(pattern)
+        return hash((ownhash, fileshash))
 
 
 class FileSectionsCollectionConfigurationStore(
