@@ -9,6 +9,7 @@ import datetime
 import decimal
 import json
 import logging
+import hashlib
 import glob
 import os
 from cStringIO import StringIO
@@ -38,12 +39,15 @@ class FilesystemMixin(object):
     def openFile(self, path, mode='r'):
         return open(path, mode)
 
-    def getFilesHash(self, pattern):
-        # With making the assumption that all object related config files
-        # start with section name + ".", we simply create the hash from the
-        # mod time of all files found.
+    def hashFile(self, filename):
+        with self.openFile(filename) as f:
+            hsh = hashlib.sha256(f.read())
+        return hsh.hexdigest()
+
+    def hashFilesByPattern(self, pattern):
+        """Return hash of all the files, specified in the glob pattern"""
         files = glob.glob(pattern)
-        filehashes =[self.getFileModTime(fn) for fn in files]
+        filehashes =[self.hashFile(fn) for fn in files]
         return hash(tuple(filehashes))
 
 
@@ -400,9 +404,12 @@ class SeparateFileCollectionConfigurationStore(
         SeparateFileConfigurationStoreMixIn, CollectionConfigurationStore):
 
     def getChildConfigHash(self, obj, config, section):
+        # With making the assumption that all object related config files
+        # start with section name + ".", we simply create the hash from the
+        # mod time of all files found.
         configPath = self.getConfigPath()
         pattern = os.path.join(configPath, "%s.*" % section)
-        return self.getFilesHash(pattern)
+        return self.hashFilesByPattern(pattern)
 
 
 class FileSectionsCollectionConfigurationStore(
@@ -459,9 +466,12 @@ class FileSectionsCollectionConfigurationStore(
         return self.section_configs[section]
 
     def getChildConfigHash(self, obj, config, section):
+        # With making the assumption that all object related config files
+        # start with section name + ".", we simply create the hash from the
+        # mod time of all files found.
         configPath = self.getConfigPath()
         pattern = os.path.join(configPath, "%s.*" % section)
-        return self.getFilesHash(pattern)
+        return self.hashFilesByPattern(pattern)
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
