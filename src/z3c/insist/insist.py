@@ -9,6 +9,7 @@ import datetime
 import decimal
 import json
 import logging
+import glob
 import os
 from cStringIO import StringIO
 
@@ -36,6 +37,15 @@ class FilesystemMixin(object):
 
     def openFile(self, path, mode='r'):
         return open(path, mode)
+
+    def getFilesHash(self, pattern):
+        # With making the assumption that all object related config files
+        # start with section name + ".", we simply create the hash from the
+        # mod time of all files found.
+        files = glob.glob(pattern)
+        print "FILES", files
+        filehashes =[self.getFileModTime(fn) for fn in files]
+        return hash(tuple(filehashes))
 
 
 log = logging.getLogger(__name__)
@@ -389,7 +399,11 @@ class SeparateFileConfigurationStore(
 
 class SeparateFileCollectionConfigurationStore(
         SeparateFileConfigurationStoreMixIn, CollectionConfigurationStore):
-    pass
+
+    def getChildConfigHash(self, obj, config, section):
+        configPath = self.getConfigPath()
+        pattern = os.path.join(configPath, "%s.*" % section)
+        return self.getFilesHash(pattern)
 
 
 class FileSectionsCollectionConfigurationStore(
@@ -446,15 +460,9 @@ class FileSectionsCollectionConfigurationStore(
         return self.section_configs[section]
 
     def getChildConfigHash(self, obj, config, section):
-        # With making the assumption that all object related config files
-        # start with section name + ".", we simply create the hash from the
-        # mod time of all files found.
         configPath = self.getConfigPath()
-        return hash(tuple([
-            self.getFileModTime(os.path.join(configPath, fn))
-            for fn in self.listDir(configPath)
-            if fn.startswith(section+'.')
-            ]))
+        pattern = os.path.join(configPath, "%s.*" % section)
+        return self.getFilesHash(pattern)
 
 
 @zope.interface.implementer(interfaces.IFieldSerializer)
