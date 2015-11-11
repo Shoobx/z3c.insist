@@ -35,6 +35,8 @@ class EnforcerEventHandler(watchdog.events.FileSystemEventHandler):
     patterns = None
     ignore_patterns = [
         '*/.#*.*',  # Emacs temporary files
+        '*/.*~',     # Vim temporary files
+        '*/*.swp',  # Vim temporary files
         ]
     case_sensitive = True
 
