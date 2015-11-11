@@ -43,7 +43,6 @@ class FilesystemMixin(object):
         # start with section name + ".", we simply create the hash from the
         # mod time of all files found.
         files = glob.glob(pattern)
-        print "FILES", files
         filehashes =[self.getFileModTime(fn) for fn in files]
         return hash(tuple(filehashes))
 
