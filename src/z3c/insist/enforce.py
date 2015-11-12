@@ -116,6 +116,8 @@ class SeparateFileEnforcerEventHandler(EnforcerEventHandler):
 class Enforcer(watchdog.observers.Observer):
     """Detects configuration changes and applies them."""
 
+    lockFilename = 'lock'
+
     handlers = {
         insist.FileSectionsCollectionConfigurationStore: \
             FileSectionsEnforcerEventHandler,
@@ -127,9 +129,50 @@ class Enforcer(watchdog.observers.Observer):
 
     def __init__(self, watched_dir, context=None):
         self.watchedDir = watched_dir
+        self.lockedDirectories = set()
         self.context = context
         self.path2HandlerCache = {}
         super(Enforcer, self).__init__()
+
+    def _handleLocks(self, event):
+        # The config directory can be locked by other processes. For that time
+        # all event listening should be suspended. Unfortuantely, oftentimes
+        # inotify events are not fired until the lock is released.
+        # The good news is that inotify guarantees the file events to be
+        # generated in order, so that we can use the lock file creation and
+        # deletion events as markers.
+        eventDir = os.path.dirname(event.src_path)
+        lockPath = os.path.join(eventDir, self.lockFilename)
+
+        # 1. Sometimes we start up without knowing about some locked
+        #    directories, so let's make sure we are up-to-date.
+        if os.path.exists(lockPath) and eventDir not in self.lockedDirectories:
+                self.lockedDirectories.add(eventDir)
+
+        # 2. If the event happened in a locked directory, we ignore the event.
+        if event.src_path != lockPath and eventDir in self.lockedDirectories:
+            logger.debug('Event ignored due to suspension: %r', event)
+            return True
+
+        # 3. If we are not dealing with a lock file, we are not handling this
+        #    event.
+        if not event.src_path.endswith(self.lockFilename):
+            return False
+
+        # 4. Now handle the various lock operations.
+        # 4.1. Add the directory to the locked directories list if the
+        #      lock file was created.
+        if event.event_type == watchdog.events.EVENT_TYPE_CREATED:
+            self.lockedDirectories.add(eventDir)
+            logger.debug('Enforcer suspended due to directory locking.')
+        # 4.2. Remove the directory from the locked directories list if the
+        #      lock file was deleted.
+        elif event.event_type == watchdog.events.EVENT_TYPE_DELETED:
+            if eventDir in self.lockedDirectories:
+                self.lockedDirectories.remove(eventDir)
+            logger.debug('Enforcer resuming after directory unlocking.')
+
+        return True
 
     def getEventHandlerForRegistration(self, reg):
         bases = reg.factory.__mro__
@@ -161,6 +204,16 @@ class Enforcer(watchdog.observers.Observer):
         event, watch = event_queue.get(block=True, timeout=timeout)
 
         with self._lock:
+            # Optimization: Ignore all dorectory modified events, since we
+            # cannot really do anything with those. It will also avoid
+            # unnecessary transactions due to lock file action.
+            if event.is_directory and \
+                event.event_type == watchdog.events.EVENT_TYPE_MODIFIED:
+                return True
+            # Handle lock file events first.
+            handled = self._handleLocks(event)
+            if handled:
+                return
             # Use simple cache from path to handler, which is specific to our
             # limited use of watchdog.
             path = event.src_path

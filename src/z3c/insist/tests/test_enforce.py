@@ -9,12 +9,38 @@ Test fixture.
 """
 import doctest
 import mock
+import os
 import unittest
 import watchdog.events
 import zope.component
 import zope.interface
+from watchdog.observers.api import ObservedWatch
 
 from z3c.insist import enforce, insist, interfaces, testing
+
+
+class SampleHandler(watchdog.events.FileSystemEventHandler):
+
+    def on_modified(self, event):
+        print event
+
+    def on_created(self, event):
+        print event
+
+    def on_deleted(self, event):
+        print event
+
+
+class EventQueue(object):
+
+    def __init__(self, event):
+        self.event = event
+
+    def get(self, block, timeout):
+        return self.event, ObservedWatch('./', True)
+
+    def task_done(self):
+        pass
 
 
 def doctest_Enforcer():
@@ -64,6 +90,49 @@ def doctest_Enforcer():
 
     >>> enf.stop = lambda: None
     >>> enf.stop()
+    """
+
+
+def doctestEnforcer_locking():
+    """Enforcer Locking Support
+
+    The enforcer will mark a directory as locked when loading the
+    configuration. This allows one to block other load and write operations on
+    that config while loading.
+
+    >>> enf = enforce.Enforcer('./')
+    >>> enf.register(SampleHandler())
+
+    Lockfiles have the following name:
+
+    >>> enf.lockFilename
+    'lock'
+
+    Before locking, handlers do their usual work:
+
+    >>> enf.dispatch_events(
+    ...     EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')), 1)
+    <FileModifiedEvent: src_path='./sample.ini'>
+
+    Now we are locking the directory, ...
+
+    >>> enf.dispatch_events(
+    ...     EventQueue(watchdog.events.FileCreatedEvent('./lock')), 1)
+
+    so no event come through:
+
+    >>> enf.dispatch_events(
+    ...     EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')), 1)
+
+    Once we unlock the directory, everything flows again:
+
+    >>> enf.dispatch_events(
+    ...     EventQueue(watchdog.events.FileDeletedEvent('./lock')), 1)
+
+    >>> enf.dispatch_events(
+    ...     EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')), 1)
+    <FileModifiedEvent: src_path='./sample.ini'>
+
     """
 
 def doctest_EnforcerFileSectionsCollectionStore():
