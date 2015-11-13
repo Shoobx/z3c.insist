@@ -83,6 +83,25 @@ class EnforcerEventHandler(watchdog.events.FileSystemEventHandler):
         raise NotImplementedError()
 
 
+class SimpleEnforcerEventHandler(EnforcerEventHandler):
+
+    def on_modified(self, event):
+        config = event.store._createConfigParser()
+        with open(event.src_path, 'r') as fle:
+            config.readfp(fle)
+        event.store.load(config)
+
+    def on_created(self, event):
+        config = event.store._createConfigParser()
+        with open(event.src_path, 'r') as fle:
+            config.readfp(fle)
+        event.store.load(config)
+
+    def on_deleted(self, event):
+        logger.error(
+            'Collection files should not be deleted: %s', event.src_path)
+
+
 class FileSectionsEnforcerEventHandler(EnforcerEventHandler):
 
     def on_modified(self, event):
