@@ -1044,6 +1044,43 @@ def doctest_DictFieldSerializer_edge_cases():
     """
 
 
+def doctest_FieldSerializer_with_None_output():
+    r"""A field serialized to None signals exclusion of field.
+
+        >>> class MyList(zope.schema.List):
+        ...     pass
+
+        >>> @zope.component.adapter(MyList, zope.interface.Interface)
+        ... class MyListSerializer(insist.ListFieldSerializer):
+        ...     def serializeValueWithNone(self, value):
+        ...         if value is None or len(value) == 0:
+        ...             return None
+        ...         return super(MyListSerializer, self).serializeValueWithNone(value)
+        ...
+        ...     def serializeValue(self, value):
+        ...         if value is None or len(value) == 0:
+        ...             return None
+        ...         return super(MyListSerializer, self).serializeValue(value)
+
+        >>> zope.component.provideAdapter(MyListSerializer)
+
+        >>> class INumbers(zope.interface.Interface):
+        ...     numbers = MyList(
+        ...         value_type=zope.schema.Int(), required=False)
+
+        >>> class Numbers(object):
+        ...     numbers = None
+
+        >>> nums = Numbers()
+        >>> nums.numbers = []
+        >>> store = insist.ConfigurationStore.makeStore(
+        ...     nums, INumbers, 'numbers')
+        >>> print store.dumps()
+        [numbers]
+
+    """
+
+
 def setUp(test):
     zope.component.testing.setUp(test)
     testing.setUpSerializers()

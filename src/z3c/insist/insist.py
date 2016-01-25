@@ -119,6 +119,10 @@ class ConfigurationStore(object):
             if self.ignore_missing and not serializer.hasValue():
                 continue
             state = serializer.serialize()
+            # Give the serializer the opportunity to decide not to provide a
+            # serialized value.
+            if state is None:
+                continue
             config.set(self.section, fn, state)
 
     def dump(self, config=None):
@@ -494,6 +498,8 @@ class FieldSerializer(object):
             return interfaces.NONE_MARKER
         else:
             result = self.serializeValue(value)
+            if result is None:
+                return None
             return result.replace(self.escape, self.escape * 2)
 
     def serialize(self):
