@@ -110,9 +110,12 @@ class ConfigurationStore(object):
                 continue
             if self.ignore_fields is not None and fn in self.ignore_fields:
                 continue
-            __traceback_info__ = (self.section, self.schema, fn)
+            ftype = field.__class__.__name__
+            __traceback_info__ = (self.section, self.schema, fn, ftype)
             if hasattr(self, 'dump_%s' % fn):
                 serializer = CustomSerializer(field, self.context, self)
+            elif hasattr(self, 'dump_type_%s' % ftype):
+                serializer = CustomFieldTypeSerializer(field, self.context, self)
             else:
                 serializer = zope.component.getMultiAdapter(
                     (field, self.context), interfaces.IFieldSerializer)
@@ -148,9 +151,12 @@ class ConfigurationStore(object):
                 continue
             #if not config.has_option(self.section, fn):
             #    continue
-            __traceback_info__ = (self.section, self.schema, fn)
+            ftype = field.__class__.__name__
+            __traceback_info__ = (self.section, self.schema, fn, ftype)
             if hasattr(self, 'load_%s' % fn):
                 serializer = CustomSerializer(field, self.context, self)
+            elif hasattr(self, 'load_type_%s' % ftype):
+                serializer = CustomFieldTypeSerializer(field, self.context, self)
             else:
                 serializer = zope.component.getMultiAdapter(
                     (field, self.context), interfaces.IFieldSerializer)
@@ -703,6 +709,25 @@ class CustomSerializer(FieldSerializer):
 
     def deserializeValue(self, value):
         return getattr(self.store, 'load_' + self.field.__name__)(value)
+
+
+class CustomFieldTypeSerializer(FieldSerializer):
+    """Allow a field-specific method on storage handle the value.
+
+    Expects that the store will have methods `dump_foo` and `load_foo`
+    that do the value conversion for field `foo`.
+    """
+    def __init__(self, field, context, store):
+        self.field = field
+        self.ftype = field.__class__.__name__
+        self.context = context
+        self.store = store
+
+    def serializeValue(self, value):
+        return getattr(self.store, 'dump_type_' + self.ftype)(self.field, value)
+
+    def deserializeValue(self, value):
+        return getattr(self.store, 'load_type_' + self.ftype)(self.field, value)
 
 
 @zope.component.adapter(zope.schema.interfaces.IDict, zope.interface.Interface)
