@@ -62,6 +62,7 @@ class ConfigurationStore(object):
     fields = None
     ignore_fields = None
     ignore_missing = False
+    ignore_default = False
     root = None
 
     def __init__(self, context=None):
@@ -121,7 +122,7 @@ class ConfigurationStore(object):
                     (field, self.context), interfaces.IFieldSerializer)
             if self.ignore_missing and not serializer.hasValue():
                 continue
-            state = serializer.serialize()
+            state = serializer.serialize(self.ignore_default)
             # Give the serializer the opportunity to decide not to provide a
             # serialized value.
             if state is None:
@@ -508,8 +509,10 @@ class FieldSerializer(object):
                 return None
             return result.replace(self.escape, self.escape * 2)
 
-    def serialize(self):
+    def serialize(self, ignoreDefault=False):
         value = getattr(self.context, self.field.__name__)
+        if ignoreDefault and value == self.field.default:
+            return None
         return self.serializeValueWithNone(value)
 
     def deserializeValueWithNone(self, value):

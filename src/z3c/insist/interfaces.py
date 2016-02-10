@@ -69,28 +69,35 @@ class IFieldSerializer(zope.interface.Interface):
     def hasValue():
         """Return True if the value is not empty/missing."""
 
-    def serialize():
-        """Return a string representation of the field"""
+    def serialize(ignoreDefault=False):
+        """Return a string representation of the field.
+
+        If ignoreDefault is True, and the value is the default, return None,
+        which signals insist to ignore the value for dumping purposes.
+        """
 
     def deserialize(state):
         """Set the field value from a given serialized state"""
 
-# helper methods:
     def serializeValueWithNone(value):
-        """return NONE_MARKER if value is None, otherwise escape
-        and call serializeValue
+        """Return NONE_MARKER if value is None, otherwise serialize normally.
         """
 
     def serializeValue(value):
-        """the real native type -> string conversion happens here"""
+        """Convert the real native type -> string.
+
+        Always must return a properly serialized string.
+        """
 
     def deserializeValueWithNone(value):
-        """return None if value is NONE_MARKER, otherwise de-escape
-        and call deserializeValue
+        """Return None if value is NONE_MARKER, otherwise deserialie normally.
         """
 
     def deserializeValue(value):
-        """the real string -> native type conversion happens here"""
+        """Convert real string -> native type.
+
+        Must always return a valid value for the given field.
+        """
 
 
 class IObjectConfigurationLoadedEvent(IObjectModifiedEvent):
