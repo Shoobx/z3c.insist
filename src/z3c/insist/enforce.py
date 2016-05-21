@@ -58,8 +58,17 @@ class EnforcerEventHandler(watchdog.events.FileSystemEventHandler):
             return self.createStore(self.factory, path)
 
     def getSectionFromEvent(self, event):
-        filename = os.path.split(event.src_path)[-1]
-        return filename.split('.', 1)[0]
+        # The file is not guaranteed to be the ini file. Section names may
+        # contain dots and file suffixes might also contain an arbitrary
+        # number of them, so we are peeling off file suffixes at the end until
+        # we find an existing ini file.
+        dirname, file_base = os.path.split(event.src_path)
+        while '.' in file_base:
+            file_base = file_base.rsplit('.', 1)[0]
+            if os.path.exists(os.path.join(dirname, file_base+'.ini')):
+                return file_base
+        raise RuntimeError(
+            'Could not find valid section name in path: %s' % event.src_path)
 
     def dispatch(self, event):
         ts = time.time()
