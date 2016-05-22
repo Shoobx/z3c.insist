@@ -79,6 +79,9 @@ class ConfigurationStore(object):
     def section(self, value):
         self._section = value
 
+    def getSectionFromPath(self, path):
+        return self.section
+
     @classmethod
     def makeStore(cls, value, schema, section=None):
         store = cls(value)
@@ -171,7 +174,6 @@ class ConfigurationStore(object):
         config = self._createConfigParser()
         config.readfp(buf)
         self.load(config)
-
 
 class CollectionConfigurationStore(ConfigurationStore):
     """A configuration store for collections.
@@ -454,6 +456,16 @@ class FileSectionsCollectionConfigurationStore(
 
     def getSectionPath(self, section):
         return os.path.join(self.getConfigPath(), section + self.filePostfix)
+
+    def getSectionFromPath(self, path):
+        config = ConfigParser
+        dirname, section_name = os.path.split(path)
+        while '.' in section_name:
+            section_name = section_name.rsplit('.', 1)[0]
+            if self.fileExists(self.getSectionPath(section_name)):
+                return section_name
+        raise RuntimeError(
+            'Could not find valid section name in path: %s' % path)
 
     def selectSections(self, sections):
         baseDir = self.getConfigPath()
