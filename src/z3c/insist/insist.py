@@ -452,7 +452,7 @@ class FileSectionsCollectionConfigurationStore(
         return store
 
     def getConfigPath(self):
-        raise NotImplemented
+        raise NotImplementedError
 
     def getSectionPath(self, section):
         return os.path.join(self.getConfigPath(), section + self.filePostfix)

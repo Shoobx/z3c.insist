@@ -144,6 +144,9 @@ def doctest_EnforcerFileSectionsCollectionStore():
     >>> class NumbersStore(enforce.EnforcerFileSectionsCollectionStore):
     ...     section = 'numbers'
     ...     section_prefix = 'number:'
+    ...
+    ...     def getSectionFromPath(self, path):
+    ...         return os.path.split(path)[-1][:-4]
 
     We can now create the store and ask for the files to listen for:
 
@@ -184,6 +187,9 @@ def doctest_EnforcerEventHandler():
     ...     @classmethod
     ...     def fromRootAndFilename(cls, root, filename=None):
     ...         return cls()
+    ...
+    ...     def getSectionFromPath(self, path):
+    ...         return os.path.split(path)[-1][:-4]
     ...
     ...     _createConfigParser = mock.Mock(return_value=config)
     ...     loadFromSection = mock.Mock()
@@ -244,6 +250,9 @@ def doctest_FileSectionsEnforcerEventHandler():
     ...     @classmethod
     ...     def fromRootAndFilename(cls, root, filename=None):
     ...         return cls()
+    ...
+    ...     def getSectionFromPath(self, path):
+    ...         return os.path.split(path)[-1][:-4]
     ...
     ...     _createConfigParser = mock.Mock(return_value=config)
     ...     loadFromSection = mock.Mock()
@@ -311,6 +320,9 @@ def doctest_SeparateFileEnforcerEventHandler():
     ...     @classmethod
     ...     def fromRootAndFilename(cls, root, filename=None):
     ...         return cls()
+    ...
+    ...     def getSectionFromPath(self, path):
+    ...         return os.path.split(path)[-1][:-4]
     ...
     ...     _createConfigParser = mock.Mock(return_value=config)
     ...     load = mock.Mock()
