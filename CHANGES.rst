@@ -1,7 +1,7 @@
 Change log
 ----------
 
-1.0.0 (unreleased)
+1.0.0 (2017-05-15)
 ~~~~~~~~~~~~~~~~~~
 
 * Initial release.
