@@ -3,19 +3,35 @@
 # Copyright 2013 by Shoobx, Inc.
 #
 ###############################################################################
+
 import os
+import sys
 from setuptools import setup, find_packages
 
+PY3 = sys.version_info.major >= 3
+
+INSTALL_REQUIRES = [
+    'setuptools',
+    'zope.schema',
+    'zope.component',
+    'zope.lifecycleevent',
+    'iso8601',
+]
+
+if not PY3:
+    INSTALL_REQUIRES += [
+        'configparser'
+    ]
 
 def read_file(filename):
     return open(os.path.join(os.path.dirname(__file__), filename)).read()
 
 setup(
     name="z3c.insist",
-    version='1.0.1.dev0',
+    version='1.1.0.dev0',
     author="Shoobx, Inc.",
     author_email="dev@shoobx.com",
-    description="Persistence to ini files",
+    description="Persistence to ini Files",
     long_description=
     read_file('README.rst') +
     '\n\n' +
@@ -28,7 +44,11 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: Implementation :: CPython',
+        'Programming Language :: Python :: Implementation :: PyPy',
         'Natural Language :: English',
         'Operating System :: OS Independent',
     ],
@@ -50,13 +70,7 @@ setup(
             'watchdog',
             ],
         ),
-    install_requires=[
-        'setuptools',
-        'zope.schema',
-        'zope.component',
-        'zope.lifecycleevent',
-        'iso8601',
-    ],
+    install_requires=INSTALL_REQUIRES,
     entry_points={
         'console_scripts': [
             'perftest = z3c.insist.perftest:main',

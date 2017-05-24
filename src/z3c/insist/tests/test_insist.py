@@ -7,12 +7,15 @@
 
 Test fixture.
 """
-import datetime
+from __future__ import print_function
+
 import collections
+import datetime
 import doctest
 import os
-import unittest
+import pprint
 import textwrap
+import unittest
 from collections import OrderedDict
 
 import zope.interface
@@ -42,12 +45,16 @@ class ISimple(zope.interface.Interface):
     text = zope.schema.Text()
 
 
+@zope.interface.implementer(ISimple)
 class Simple(object):
-    zope.interface.implements(ISimple)
     def __init__(self, text=None):
         self.text = text
+
     def __repr__(self):
         return 'Simple(%r)' % self.text
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.text == other.text
 
 
 class IPerson(zope.interface.Interface):
@@ -74,6 +81,11 @@ class Person(object):
              "male" if self.male else "female",
              self.salary)
 
+    def __eq__(self, other):
+        return \
+          (self.firstname, self.lastname, self.salary, self.male) == \
+          (other.firstname, other.lastname, other.salary, other.male)
+
 @zope.interface.implementer(ICompany)
 class Company(object):
     def __init__(self, name=None):
@@ -81,6 +93,9 @@ class Company(object):
 
     def  __repr__(self):
         return "<Company %s>" % self.name
+
+    def __eq__(self, other):
+        return self.name == other.name
 
 
 class PersonCollectionStore(insist.CollectionConfigurationStore):
@@ -104,981 +119,1007 @@ class MixedClassCollectionStore(insist.CollectionConfigurationStore):
             return Company()
 
 
-def doctest_FieldSerializer_None():
-    """Test escaping of None values and handling of the escape character
+class InsistTest(unittest.TestCase):
 
-       >>> obj = NoneTestObject()
-       >>> store = insist.ConfigurationStore.makeStore(
-       ...     obj, INoneTestSchema, 'test')
+    def setUp(self):
+        zope.component.testing.setUp(self)
+        testing.setUpSerializers()
 
-    Nones and bangs get escaped:
-
-       >>> print store.dumps()
-       [test]
-       test1 = !!None
-       test2 = !None
-       test3 = To infinity!! And beyond!!
-       test4 = !None
-
-    Now let's test the roundtrip:
-
-       >>> store.loads(store.dumps())
-
-       >>> obj.test1
-       u'!None'
-       >>> obj.test2
-       >>> obj.test3
-       u'To infinity! And beyond!'
-       >>> obj.test4
-
-    """
+    def tearDown(self):
+        zope.component.testing.tearDown(self)
 
 
-def doctest_ConfigurationStore_load_missing_values():
-    r"""Test that missing configuration values are handled fine.
+class FieldSerializerTest(InsistTest):
 
-       >>> obj = NoneTestObject()
-       >>> store = insist.ConfigurationStore.makeStore(
-       ...     obj, INoneTestSchema, 'test')
+    def test_handle_None(self):
+        """Test escaping of None values and handling of the escape character
+        """
 
-       >>> store.loads('''\
-       ... [test]
-       ... test1 = foo
-       ... ''')
+        obj = NoneTestObject()
+        store = insist.ConfigurationStore.makeStore(
+            obj, INoneTestSchema, 'test')
 
-       >>> obj.test1
-       u'foo'
-       >>> obj.test2
-       >>> obj.test3
-       u'To infinity! And beyond!'
-       >>> obj.test4
+        # Nones and bangs get escaped:
+        self.assertEqual(
+            ('[test]\n'
+             'test1 = !!None\n'
+             'test2 = !None\n'
+             'test3 = To infinity!! And beyond!!\n'
+             'test4 = !None\n\n'),
+             store.dumps())
 
-    """
+        # Now let's test the roundtrip:
+        store.loads(store.dumps())
+
+        self.assertEqual(u'!None', obj.test1)
+        self.assertIsNone(obj.test2)
+        self.assertEqual(u'To infinity! And beyond!', obj.test3)
+        self.assertIsNone(obj.test4)
+
+    def test_with_None_output(self):
+        """A field serialized to None signals exclusion of field.
+        """
+        class MyList(zope.schema.List):
+            pass
+
+        @zope.component.adapter(MyList, zope.interface.Interface)
+        class MyListSerializer(insist.ListFieldSerializer):
+            def serializeValueWithNone(self, value):
+                if value is None or len(value) == 0:
+                    return None
+                return super(MyListSerializer, self)\
+                  .serializeValueWithNone(value)
+
+            def serializeValue(self, value):
+                if value is None or len(value) == 0:
+                    return None
+                return super(MyListSerializer, self).serializeValue(value)
+
+        zope.component.provideAdapter(MyListSerializer)
+
+        class INumbers(zope.interface.Interface):
+            numbers = MyList(
+                value_type=zope.schema.Int(), required=False)
+
+        class Numbers(object):
+            numbers = None
+
+        nums = Numbers()
+        nums.numbers = []
+        store = insist.ConfigurationStore.makeStore(nums, INumbers, 'numbers')
+        self.assertEqual('[numbers]\n\n', store.dumps())
 
 
-def doctest_ConfigurationStore_section():
-    """The section name defaults to the interface name.
+class ConfigurationStoreTest(InsistTest):
 
-       >>> obj = NoneTestObject()
-       >>> store = insist.ConfigurationStore(obj)
-       >>> store.schema = INoneTestSchema
+    def test_load_missing_values(self):
+        """Test that missing configuration values are handled fine.
+        """
+        obj = NoneTestObject()
+        store = insist.ConfigurationStore.makeStore(
+            obj, INoneTestSchema, 'test')
 
-       >>> store.section
-       'INoneTestSchema'
+        store.loads(
+            '[test]\n'
+            'test1 = foo\n'
+        )
 
-       >>> store.section = 'specific'
-       >>> store.section
-       'specific'
+        self.assertEqual(u'foo', obj.test1)
+        self.assertIsNone(obj.test2)
+        self.assertEqual(u'To infinity! And beyond!', obj.test3)
+        self.assertIsNone(obj.test4)
 
-    """
+    def test_section(self):
+        """The section name defaults to the interface name.
+        """
+        obj = NoneTestObject()
+        store = insist.ConfigurationStore(obj)
+        store.schema = INoneTestSchema
 
+        self.assertEqual('INoneTestSchema', store.section)
 
-def doctest_ConfigurationStore_file_header():
-    """The configurations tore can also place a file header on top of the file.
-
-       >>> obj = NoneTestObject()
-       >>> store = insist.ConfigurationStore.makeStore(
-       ...     obj, INoneTestSchema, 'test')
-       >>> store.file_header = '# Nice file header\\n'
-
-    Nones and bangs get escaped:
-
-       >>> print store.dumps()
-       # Nice file header
-       <BLANKLINE>
-       [test]
-       test1 = !!None
-       test2 = !None
-       test3 = To infinity!! And beyond!!
-       test4 = !None
-
-    """
+        store.section = 'specific'
+        self.assertEqual('specific', store.section)
 
 
-def doctest_CollectionConfigurationStore():
+    def test_file_header(self):
+        """The configurations tore can also place a file header on top
+        of the file.
+        """
+        obj = NoneTestObject()
+        store = insist.ConfigurationStore.makeStore(
+            obj, INoneTestSchema, 'test')
+        store.file_header = '# Nice file header\\n'
+
+        # Nones and bangs get escaped:
+        self.assertTrue(
+            store.dumps().startswith('# Nice file header'))
+
+
+class CollectionConfigurationStoreTest(InsistTest):
     """Collection Configuration Store Tests
 
-    This configuration store orchestrates storage of collections/mappings. To
-    make the collection store usable a few attributes and methods must be
-    provided:
-
-       >>> class SimpleCollectionStore(insist.CollectionConfigurationStore):
-       ...     schema = ISimple
-       ...     section_prefix = 'simple:'
-       ...     item_factory = Simple
-
-    We also have to register a store for the object itself:
-
-       >>> @zope.component.adapter(ISimple)
-       ... @zope.interface.implementer(interfaces.IConfigurationStore)
-       ... class SimpleStore(insist.ConfigurationStore):
-       ...     schema = ISimple
-
-       >>> reg = zope.component.provideAdapter(SimpleStore)
-
-    Now, let's create a simple collection and create a store for it:
-
-       >>> coll = collections.OrderedDict([
-       ...     ('one', Simple(u'Number 1')),
-       ...     ('two', Simple(u'Two is a charm')),
-       ...     ('three', Simple(u'The tail.'))
-       ...     ])
-
-       >>> store = SimpleCollectionStore(coll)
-
-    Let's have a look at the dump:
-
-       >>> print store.dumps()
-       [simple:one]
-       text = Number 1
-       <BLANKLINE>
-       [simple:two]
-       text = Two is a charm
-       <BLANKLINE>
-       [simple:three]
-       text = The tail.
-
-    Now let's test the roundtrip:
-
-       >>> coll2 = {}
-       >>> store2 = SimpleCollectionStore(coll2)
-       >>> store2.loads(store.dumps())
-
-       >>> import pprint
-       >>> pprint.pprint(coll2)
-       {'one': Simple(u'Number 1'),
-        'three': Simple(u'The tail.'),
-        'two': Simple(u'Two is a charm')}
-
+    This configuration store orchestrates storage of
+    collections/mappings. To make the collection store usable a
+    few attributes and methods must be provided:
     """
 
+    def test_component(self):
 
-def doctest_SeparateFileConfigurationStore():
+        class SimpleCollectionStore(insist.CollectionConfigurationStore):
+            schema = ISimple
+            section_prefix = 'simple:'
+            item_factory = Simple
+
+        # We also have to register a store for the object itself:
+
+        @zope.component.adapter(ISimple)
+        @zope.interface.implementer(interfaces.IConfigurationStore)
+        class SimpleStore(insist.ConfigurationStore):
+            schema = ISimple
+
+        reg = zope.component.provideAdapter(SimpleStore)
+
+        # Now, let's create a simple collection and create a store for it:
+
+        coll = collections.OrderedDict([
+            ('one', Simple(u'Number 1')),
+            ('two', Simple(u'Two is a charm')),
+            ('three', Simple(u'The tail.'))
+            ])
+
+        store = SimpleCollectionStore(coll)
+
+        # Let's have a look at the dump:
+
+        self.assertEqual(
+            ('[simple:one]\n'
+             'text = Number 1\n'
+             '\n'
+             '[simple:two]\n'
+             'text = Two is a charm\n'
+             '\n'
+             '[simple:three]\n'
+             'text = The tail.\n\n'),
+             store.dumps())
+
+        # Now let's test the roundtrip:
+
+        coll2 = {}
+        store2 = SimpleCollectionStore(coll2)
+        store2.loads(store.dumps())
+
+        self.assertEqual(
+            {'one': Simple('Number 1'),
+             'three': Simple('The tail.'),
+             'two': Simple('Two is a charm')},
+            coll2)
+
+
+class SeparateFileConfigurationStoreTest(InsistTest):
     """Separate File Configuration Store Test
 
     As the name suggests, this store allows its configuration to be stored in
     a separate file. For this store to work, we need to implement a method
     that tells the store where to store the file:
-
-       >>> import tempfile
-       >>> dir = tempfile.mkdtemp()
-
-       >>> class NoneTestStore(insist.SeparateFileConfigurationStore):
-       ...     def getConfigPath(self):
-       ...         return dir
-
-    Let's now dump our data:
-
-       >>> obj = NoneTestObject()
-       >>> store = NoneTestStore.makeStore(obj, INoneTestSchema, 'test')
-
-    As we can see, a small stub of the configuration si written to the
-    original store.
-
-       >>> print store.dumps()
-       [test]
-       config-file = test.ini
-
-    But the actual data is in the new file, which is named by default like the
-    section:
-
-       >>> with open(os.path.join(dir, 'test.ini')) as file:
-       ...     print file.read()
-       [test]
-       test1 = !!None
-       test2 = !None
-       test3 = To infinity!! And beyond!!
-       test4 = !None
-
-    Let's now load the data again:
-
-       >>> obj2 = NoneTestObject()
-       >>> obj2.test1 = obj2.test2 = obj2.test3 = u'Test'
-       >>> obj2.test4 = 5
-       >>> store2 = NoneTestStore.makeStore(obj2, INoneTestSchema, 'test')
-
-       >>> store2.loads(store.dumps())
-       >>> obj2.test1
-       u'!None'
-       >>> obj2.test2
-       >>> obj2.test3
-       u'To infinity! And beyond!'
-       >>> obj2.test4
-
-    We can also tell the store not to leave the stub in the main config
-    file. That requires extra code though to ensure that all config files are
-    loaded.
-
-       >>> store.dumpSectionStub = False
-       >>> print store.dumps()
-       <BLANKLINE>
-
-    Finally, in order to ease migration from monolithic configuration files to
-    split files, the store reads the main configuration if it cannot find the
-    file.
-
-       >>> os.remove(os.path.join(dir, 'test.ini'))
-       >>> os.listdir(dir)
-       []
-
-       >>> obj3 = NoneTestObject()
-       >>> obj3.test1 = obj3.test2 = obj3.test3 = u'Test'
-       >>> store3 = NoneTestStore.makeStore(obj3, INoneTestSchema, 'test')
-
-       >>> store3.loads('''
-       ... [test]
-       ... test1 = !!None
-       ... test2 = !None
-       ... test3 = To infinity!! And beyond!!
-       ... test4 = !None
-       ... ''')
-       >>> obj3.test1
-       u'!None'
-       >>> obj3.test2
-       >>> obj3.test3
-       u'To infinity! And beyond!'
-       >>> obj3.test4
     """
 
+    def test_component(self):
+        import tempfile
+        dir = tempfile.mkdtemp()
 
-def doctest_SeparateFileCollectionConfigurationStore():
+        class NoneTestStore(insist.SeparateFileConfigurationStore):
+            def getConfigPath(self):
+                return dir
+
+        # Let's now dump our data:
+        obj = NoneTestObject()
+        store = NoneTestStore.makeStore(obj, INoneTestSchema, 'test')
+
+        # As we can see, a small stub of the configuration si written to the
+        # original store.
+
+        self.assertEqual(
+            ('[test]\n'
+             'config-file = test.ini\n\n'),
+             store.dumps())
+
+        # But the actual data is in the new file, which is named by
+        # default like the section:
+
+        with open(os.path.join(dir, 'test.ini')) as file:
+            self.assertEqual(
+                ('[test]\n'
+                 'test1 = !!None\n'
+                 'test2 = !None\n'
+                 'test3 = To infinity!! And beyond!!\n'
+                 'test4 = !None\n\n'),
+                 file.read())
+
+        # Let's now load the data again:
+        obj2 = NoneTestObject()
+        obj2.test1 = obj2.test2 = obj2.test3 = u'Test'
+        obj2.test4 = 5
+        store2 = NoneTestStore.makeStore(obj2, INoneTestSchema, 'test')
+
+        store2.loads(store.dumps())
+        self.assertEqual(u'!None', obj2.test1)
+        self.assertIsNone(obj2.test2)
+        self.assertEqual(u'To infinity! And beyond!', obj2.test3)
+        self.assertIsNone(obj2.test4)
+
+        # We can also tell the store not to leave the stub in the main config
+        # file. That requires extra code though to ensure that all config files
+        # are loaded.
+
+        store.dumpSectionStub = False
+        self.assertEqual('', store.dumps())
+
+        # Finally, in order to ease migration from monolithic configuration
+        # files to split files, the store reads the main configuration if it
+        # cannot find the file.
+
+        os.remove(os.path.join(dir, 'test.ini'))
+        self.assertEqual([], os.listdir(dir))
+
+        obj3 = NoneTestObject()
+        obj3.test1 = obj3.test2 = obj3.test3 = u'Test'
+        store3 = NoneTestStore.makeStore(obj3, INoneTestSchema, 'test')
+
+        store3.loads(
+            '[test]\n'
+            'test1 = !!None\n'
+            'test2 = !None\n'
+            'test3 = To infinity!! And beyond!!\n'
+            'test4 = !None\n\n')
+
+        self.assertEqual(u'!None', obj3.test1)
+        self.assertIsNone(obj3.test2)
+        self.assertEqual(u'To infinity! And beyond!', obj3.test3)
+        self.assertIsNone(obj3.test4)
+
+
+class SeparateFileCollectionConfigurationStoreTest(InsistTest):
     """Separate File Collection Configuration Store Test
 
     This class is very similar to the regular colelction store except that all
     items are stored in a separate file. So let's do the setup:
-
-       >>> import tempfile
-       >>> dir = tempfile.mkdtemp()
-
-       >>> class SimpleCollectionStore(
-       ...         insist.SeparateFileCollectionConfigurationStore):
-       ...
-       ...     section = 'simple-collection'
-       ...     schema = ISimple
-       ...     section_prefix = 'simple:'
-       ...     item_factory = Simple
-       ...
-       ...     def getConfigPath(self):
-       ...         return dir
-
-       >>> @zope.component.adapter(ISimple)
-       ... @zope.interface.implementer(interfaces.IConfigurationStore)
-       ... class SimpleStore(insist.ConfigurationStore):
-       ...     schema = ISimple
-
-       >>> reg = zope.component.provideAdapter(SimpleStore)
-
-    Now, let's create a simple collection and create a store for it:
-
-       >>> coll = collections.OrderedDict([
-       ...     ('one', Simple(u'Number 1')),
-       ...     ('two', Simple(u'Two is a charm')),
-       ...     ('three', Simple(u'The tail.'))
-       ...     ])
-
-       >>> store = SimpleCollectionStore(coll)
-
-    Let's have a look at the dump:
-
-       >>> print store.dumps()
-       [simple-collection]
-       config-file = simple-collection.ini
-
-       >>> with open(os.path.join(dir, 'simple-collection.ini')) as file:
-       ...     print file.read()
-       [simple:one]
-       text = Number 1
-       <BLANKLINE>
-       [simple:two]
-       text = Two is a charm
-       <BLANKLINE>
-       [simple:three]
-       text = The tail.
-
-
-    Let's now ensure that we can load the data again:
-
-       >>> coll2 = {}
-       >>> store2 = SimpleCollectionStore(coll2)
-       >>> store2.loads(store.dumps())
-
-       >>> import pprint
-       >>> pprint.pprint(coll2)
-       {'one': Simple(u'Number 1'),
-        'three': Simple(u'The tail.'),
-        'two': Simple(u'Two is a charm')}
-
     """
 
+    def test_component(self):
+        import tempfile
+        dir = tempfile.mkdtemp()
 
-def doctest_FileSectionsCollectionConfigurationStore():
+        class SimpleCollectionStore(
+                insist.SeparateFileCollectionConfigurationStore):
+
+            section = 'simple-collection'
+            schema = ISimple
+            section_prefix = 'simple:'
+            item_factory = Simple
+
+            def getConfigPath(self):
+                return dir
+
+        @zope.component.adapter(ISimple)
+        @zope.interface.implementer(interfaces.IConfigurationStore)
+        class SimpleStore(insist.ConfigurationStore):
+            schema = ISimple
+
+        reg = zope.component.provideAdapter(SimpleStore)
+
+        # Now, let's create a simple collection and create a store for it:
+
+        coll = collections.OrderedDict([
+            ('one', Simple(u'Number 1')),
+            ('two', Simple(u'Two is a charm')),
+            ('three', Simple(u'The tail.'))
+            ])
+
+        store = SimpleCollectionStore(coll)
+
+        # Let's have a look at the dump:
+        self.assertEqual(
+            ('[simple-collection]\n'
+             'config-file = simple-collection.ini\n\n'),
+             store.dumps())
+
+        with open(os.path.join(dir, 'simple-collection.ini')) as file:
+            self.assertEqual(
+                ('[simple:one]\n'
+                'text = Number 1\n'
+                '\n'
+                '[simple:two]\n'
+                'text = Two is a charm\n'
+                '\n'
+                '[simple:three]\n'
+                'text = The tail.\n\n'),
+                file.read())
+
+        # Let's now ensure that we can load the data again:
+        coll2 = {}
+        store2 = SimpleCollectionStore(coll2)
+        store2.loads(store.dumps())
+
+        self.assertEqual(
+            {'one': Simple(u'Number 1'),
+             'three': Simple(u'The tail.'),
+             'two': Simple(u'Two is a charm')},
+             coll2)
+
+
+class FileSectionsCollectionConfigurationStoreTest(InsistTest):
     """File Section Configuration Store Test
 
     If you do not want to store a stub of a section in the main config file,
     you have to provide the collection config store with the ability to
     discover configuration files and only select the correct ones.
-
-    Let's setup a collection store with its file object store that does not
-    dump the stub.
-
-       >>> import tempfile
-       >>> dir = tempfile.mkdtemp()
-
-       >>> class SimpleCollectionStore(
-       ...         insist.FileSectionsCollectionConfigurationStore):
-       ...
-       ...     schema = ISimple
-       ...     section_prefix = 'simple:'
-       ...     item_factory = Simple
-       ...
-       ...     def getConfigPath(self):
-       ...         return dir
-
-       >>> @zope.component.adapter(ISimple)
-       ... @zope.interface.implementer_only(interfaces.IConfigurationStore)
-       ... class SimpleStore(insist.SeparateFileConfigurationStore):
-       ...     dumpSectionStub = False
-       ...     schema = ISimple
-       ...
-       ...     def getConfigPath(self):
-       ...         return dir
-
-       >>> reg = zope.component.provideAdapter(SimpleStore)
-
-    Okay, now things are getting exciting. Let's dump a collection and see
-    what happens:
-
-       >>> coll = collections.OrderedDict([
-       ...     ('one', Simple(u'Number 1')),
-       ...     ('two', Simple(u'Two is a charm')),
-       ...     ('three', Simple(u'The tail.'))
-       ...     ])
-
-       >>> store = SimpleCollectionStore(coll)
-       >>> print store.dumps()
-       <BLANKLINE>
-
-       >>> for fn in sorted(os.listdir(dir)):
-       ...     if not fn.startswith(store.section_prefix):
-       ...         continue
-       ...     with open(os.path.join(dir, fn)) as file:
-       ...         print '---', fn, '---'
-       ...         print file.read()
-       --- simple:one.ini ---
-       [simple:one]
-       text = Number 1
-       <BLANKLINE>
-       --- simple:three.ini ---
-       [simple:three]
-       text = The tail.
-       <BLANKLINE>
-       --- simple:two.ini ---
-       [simple:two]
-       text = Two is a charm
-
-    Now the more interesting part, loading everything again:
-
-       >>> coll2 = {}
-       >>> store2 = SimpleCollectionStore(coll2)
-       >>> store2.loads(store.dumps())
-
-       >>> import pprint
-       >>> pprint.pprint(coll2)
-       {'one': Simple(u'Number 1'),
-        'three': Simple(u'The tail.'),
-        'two': Simple(u'Two is a charm')}
-
-    Also, the config hash of any item is determined by the mod time of all
-    files starting with that section name:
-
-       >>> orig_hash = store.getChildConfigHash(coll['one'], None, 'simple:one')
-
-       >>> info_fn = os.path.join(store.getConfigPath(), 'simple:one.info')
-       >>> with open(info_fn, 'w') as file:
-       ...     file.write('Info')
-       >>> new_hash = store.getChildConfigHash(coll['one'], None, 'simple:one')
-
-       >>> orig_hash == new_hash
-       False
-
-       >>> os.remove(info_fn)
-       >>> new_hash = store.getChildConfigHash(coll['one'], None, 'simple:one')
-
-       >>> orig_hash == new_hash
-       True
     """
 
-
-def doctest_CollectionConfigStore_dump():
-    """
-        Collections can be stored semi-automatically
-
-        >>> coll = {
-        ...     'jeb': Person("Jebediah", "Kerman", 20000, True),
-        ...     'val': Person("Valentina", "Kerman", 30000, False),
-        ... }
-        >>> itemstore = lambda ctx: insist.ConfigurationStore.makeStore(
-        ...     ctx, IPerson, 'test')
-        >>> gsm = zope.component.getGlobalSiteManager()
-        >>> gsm.registerAdapter(itemstore, (IPerson, ), interfaces.IConfigurationStore, '')
-
-        >>> store = PersonCollectionStore(coll)
-        >>> print store.dumps()
-        [person:jeb]
-        firstname = Jebediah
-        lastname = Kerman
-        salary = 20000
-        male = True
-        <BLANKLINE>
-        [person:val]
-        firstname = Valentina
-        lastname = Kerman
-        salary = 30000
-        male = False
-    """
-
-
-def doctest_CollectionConfigStore_load_fresh():
-    """ Load completely new collection
-
-        >>> ini = textwrap.dedent('''
-        ... [person:jeb]
-        ... firstname = Jebediah
-        ... lastname = Kerman
-        ... salary = 20000
-        ... male = True
-        ...
-        ... [person:val]
-        ... firstname = Valentina
-        ... lastname = Kerman
-        ... salary = 30000
-        ... male = False
-        ... ''')
-
-        >>> itemstore = lambda ctx: insist.ConfigurationStore.makeStore(
-        ...     ctx, IPerson, 'test')
-        >>> gsm = zope.component.getGlobalSiteManager()
-        >>> gsm.registerAdapter(itemstore, (IPerson, ), interfaces.IConfigurationStore, '')
-
-        >>> coll = {}
-        >>> store = PersonCollectionStore(coll)
-        >>> store.loads(ini)
-
-        >>> coll
-        {'jeb': <Person Jebediah Kerman, male, salary: 20000>,
-         'val': <Person Valentina Kerman, female, salary: 30000>}
-    """
-
-
-def doctest_CollectionConfigStore_load_changeaddremove():
-    """ Add one item and remove another
-
-    Load initial collection
-        >>> ini = textwrap.dedent('''
-        ... [person:jeb]
-        ... firstname = Jebediah
-        ... lastname = Kerman
-        ... salary = 20000
-        ... male = True
-        ...
-        ... [person:val]
-        ... firstname = Valentina
-        ... lastname = Kerman
-        ... salary = 30000
-        ... male = False
-        ... ''')
-
-        >>> itemstore = lambda ctx: insist.ConfigurationStore.makeStore(
-        ...     ctx, IPerson, 'test')
-        >>> gsm = zope.component.getGlobalSiteManager()
-        >>> gsm.registerAdapter(itemstore, (IPerson, ), interfaces.IConfigurationStore, '')
-
-        >>> coll = {}
-        >>> store = PersonCollectionStore(coll)
-        >>> store.loads(ini)
-
-        >>> coll
-        {'jeb': <Person Jebediah Kerman, male, salary: 20000>,
-         'val': <Person Valentina Kerman, female, salary: 30000>}
-
-    Save loaded items for future reference
-
-        >>> jeb = coll['jeb']
-        >>> val = coll['val']
-
-    Now let's change the configuration - remove one item and add another
-
-        >>> ini = textwrap.dedent('''
-        ... [person:bill]
-        ... firstname = Bill
-        ... lastname = Kerman
-        ... salary = 30000
-        ... male = True
-        ...
-        ... [person:val]
-        ... firstname = Valentina
-        ... lastname = Kerman
-        ... salary = 30000
-        ... male = False
-        ... ''')
-
-        >>> store.loads(ini)
-        >>> coll
-        {'bill': <Person Bill Kerman, male, salary: 30000>,
-         'val': <Person Valentina Kerman, female, salary: 30000>}
-
-        >>> bill = coll['bill']
-
-    Make sure we didn't just edit "jeb", but created new item. Also, `val`
-    should stay unchanged.
-
-        >>> jeb is coll['bill']
-        False
-
-        >>> val is coll['val']
-        True
-
-    Now, change the salary of a bill, and remove val
-
-        >>> ini = textwrap.dedent('''
-        ... [person:bill]
-        ... firstname = Bill
-        ... lastname = Kerman
-        ... salary = 50000
-        ... male = True
-        ... ''')
-
-        >>> store.loads(ini)
-        >>> coll
-        {'bill': <Person Bill Kerman, male, salary: 50000>}
-
-    Bill should not change his identity by this operation
-
-        >>> bill is coll['bill']
-        True
-    """
-
-
-def doctest_CollectionConfigStore_load_typed():
-    """ Test collections with items of different types
-
-    First, register adapters
-        >>> gsm = zope.component.getGlobalSiteManager()
-
-        >>> personstore = lambda ctx: insist.ConfigurationStore.makeStore(
-        ...     ctx, IPerson, 'person')
-        >>> gsm.registerAdapter(personstore, (IPerson, ),
-        ...                     interfaces.IConfigurationStore, '')
-
-        >>> companystore = lambda ctx: insist.ConfigurationStore.makeStore(
-        ...     ctx, ICompany, 'company')
-        >>> gsm.registerAdapter(companystore, (ICompany, ),
-        ...                     interfaces.IConfigurationStore, '')
-
-        >>> coll = {}
-        >>> store = MixedClassCollectionStore(coll)
-
-    Load initial data
-        >>> ini = textwrap.dedent('''
-        ... [item:jeb]
-        ... type = person
-        ... firstname = Jebediah
-        ... lastname = Kerman
-        ... salary = 20000
-        ... male = True
-        ...
-        ... [item:pp]
-        ... type = company
-        ... name = Pied Piper, Inc
-        ... ''')
-
-        >>> store.loads(ini)
-
-        >>> coll
-        {'jeb': <Person Jebediah Kerman, male, salary: 20000>,
-         'pp': <Company Pied Piper, Inc>}
-
-    Now, suddenly, jeb becomes a company
-
-        >>> ini = textwrap.dedent('''
-        ... [item:jeb]
-        ... type = company
-        ... name = Jeb Startup, Inc
-        ...
-        ... [item:pp]
-        ... type = company
-        ... name = Pied Piper, Inc
-        ... ''')
-
-        >>> store.loads(ini)
-        >>> coll
-        {'jeb': <Company Jeb Startup, Inc>,
-         'pp': <Company Pied Piper, Inc>}
-
-    """
-
-
-def doctest_ListFieldSerializer_edge_cases():
-    r"""
-    Tuple and list fields are serialized as multiline values.
-
-    Check that None gets serialized and can be read back
-
-        >>> class INumbers(zope.interface.Interface):
-        ...     numbers = zope.schema.List(
-        ...         value_type=zope.schema.Int())
-
-        >>> class Numbers(object):
-        ...     numbers = None
-
-        >>> nums = Numbers()
-        >>> nums.numbers = [42, None]
-        >>> store = insist.ConfigurationStore.makeStore(nums, INumbers, 'numbers')
-        >>> print store.dumps()
-        [numbers]
-        numbers = 42, !!None
-
-    Well it gets double escaped...
-    But it won't fail loading
-
-        >>> store.loads('''\
-        ... [numbers]
-        ... numbers = 42, !!None
-        ... ''')
-        >>> nums.numbers
-        [42, None]
-
-        >>> store.loads('''\
-        ... [numbers]
-        ... numbers =
-        ... ''')
-        >>> nums.numbers
-        []
-
-
-    Check what happens when there's a separator in an item
-
-        >>> class ISomeTexts(zope.interface.Interface):
-        ...     sometexts = zope.schema.List(
-        ...         value_type=zope.schema.TextLine())
-
-        >>> class SomeTexts(object):
-        ...     sometexts = None
-
-        >>> texts = SomeTexts()
-        >>> texts.sometexts = [u'42', None, u', ', u'foo']
-        >>> store = insist.ConfigurationStore.makeStore(
-        ...     texts, ISomeTexts, 'sometexts')
-        >>> print store.dumps()
-        [sometexts]
-        sometexts = 42, !!None, , , foo
-
-        >>> store.loads('''\
-        ... [sometexts]
-        ... sometexts = 42, !!None, , , foo
-        ... ''')
-
-    oooooooooops, that u', ' we sent in is gone...
-    don't try this at home
-
-        >>> texts.sometexts
-        [u'42', None, u'', u'', u'foo']
-
-
-    Let's see what happens is value_type is List
-
-        >>> class IPerson(zope.interface.Interface):
-        ...     somedata = zope.schema.List(
-        ...         value_type=zope.schema.Dict(
-        ...             key_type=zope.schema.TextLine(),
-        ...             value_type=zope.schema.TextLine()))
-
-        >>> class Person(object):
-        ...     somedata = None
-
-        >>> p = Person()
-        >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
-
-        >>> p.somedata = [
-        ...     {u'first': u'foo'}, {u'second': u'bar', u'third': u'fun'}]
-        >>> print store.dumps()
-        [person]
-        somedata = first::foo, second::bar
-            third::fun
-
-        >>> store.loads(store.dumps())
-        >>> p.somedata
-        [{u'first': u'foo'}, {u'second': u'bar', u'third': u'fun'}]
-
+    def test_component(self):
+        # Let's setup a collection store with its file object store
+        # that does not dump the stub.
+
+        import tempfile
+        dir = tempfile.mkdtemp()
+
+        class SimpleCollectionStore(
+                insist.FileSectionsCollectionConfigurationStore):
+
+            schema = ISimple
+            section_prefix = 'simple:'
+            item_factory = Simple
+
+            def getConfigPath(self):
+                return dir
+
+        @zope.component.adapter(ISimple)
+        @zope.interface.implementer_only(interfaces.IConfigurationStore)
+        class SimpleStore(insist.SeparateFileConfigurationStore):
+            dumpSectionStub = False
+            schema = ISimple
+
+            def getConfigPath(self):
+                return dir
+
+        reg = zope.component.provideAdapter(SimpleStore)
+
+        # Okay, now things are getting exciting. Let's dump a collection
+        # and see what happens:
+        coll = collections.OrderedDict([
+            ('one', Simple(u'Number 1')),
+            ('two', Simple(u'Two is a charm')),
+            ('three', Simple(u'The tail.'))
+            ])
+
+        store = SimpleCollectionStore(coll)
+        self.assertEqual('', store.dumps())
+
+        with open(os.path.join(dir, 'simple:one.ini')) as file:
+            self.assertEqual(
+                ('[simple:one]\n'
+                 'text = Number 1\n\n'),
+                 file.read())
+        with open(os.path.join(dir, 'simple:two.ini')) as file:
+            self.assertEqual(
+                ('[simple:two]\n'
+                 'text = Two is a charm\n\n'),
+                 file.read())
+        with open(os.path.join(dir, 'simple:three.ini')) as file:
+            self.assertEqual(
+                ('[simple:three]\n'
+                 'text = The tail.\n\n'),
+                 file.read())
+
+        # Now the more interesting part, loading everything again:
+        coll2 = {}
+        store2 = SimpleCollectionStore(coll2)
+        store2.loads(store.dumps())
+
+        self.assertEqual(
+            {'one': Simple(u'Number 1'),
+             'three': Simple(u'The tail.'),
+             'two': Simple(u'Two is a charm')},
+             coll2)
+
+        # Also, the config hash of any item is determined by the mod time of
+        # all files starting with that section name:
+
+        orig_hash = store.getChildConfigHash(coll['one'], None, 'simple:one')
+
+        info_fn = os.path.join(store.getConfigPath(), 'simple:one.info')
+        with open(info_fn, 'w') as file:
+           file.write('Info')
+        new_hash = store.getChildConfigHash(coll['one'], None, 'simple:one')
+
+        self.assertNotEqual(orig_hash, new_hash)
+
+        os.remove(info_fn)
+        new_hash = store.getChildConfigHash(coll['one'], None, 'simple:one')
+
+        self.assertEqual(orig_hash, new_hash)
+
+
+class CollectionConfigStoreTest(InsistTest):
+
+    def test_dump(self):
+        """Collections can be stored semi-automatically
+        """
+
+        coll = OrderedDict([
+            (u'jeb', Person(u"Jebediah", u"Kerman", 20000, True)),
+            (u'val', Person(u"Valentina", u"Kerman", 30000, False)),
+        ])
+        itemstore = lambda ctx: insist.ConfigurationStore.makeStore(
+            ctx, IPerson, 'test')
+        gsm = zope.component.getGlobalSiteManager()
+        gsm.registerAdapter(
+            itemstore, (IPerson, ), interfaces.IConfigurationStore, '')
+
+        store = PersonCollectionStore(coll)
+        self.assertEqual(
+            ('[person:jeb]\n'
+             'firstname = Jebediah\n'
+             'lastname = Kerman\n'
+             'salary = 20000\n'
+             'male = True\n'
+             '\n'
+             '[person:val]\n'
+             'firstname = Valentina\n'
+             'lastname = Kerman\n'
+             'salary = 30000\n'
+             'male = False\n\n'),
+             store.dumps())
+
+
+    def test_load_fresh(self):
+        """Load completely new collection
+        """
+
+        ini = textwrap.dedent('''
+            [person:jeb]
+            firstname = Jebediah
+            lastname = Kerman
+            salary = 20000
+            male = True
+
+            [person:val]
+            firstname = Valentina
+            lastname = Kerman
+            salary = 30000
+            male = False
+        ''')
+
+        itemstore = lambda ctx: insist.ConfigurationStore.makeStore(
+            ctx, IPerson, 'test')
+        gsm = zope.component.getGlobalSiteManager()
+        gsm.registerAdapter(
+            itemstore, (IPerson, ), interfaces.IConfigurationStore, '')
+
+        coll = {}
+        store = PersonCollectionStore(coll)
+        store.loads(ini)
+
+        self.assertEqual(
+            {'jeb': Person(u'Jebediah', u'Kerman', 20000, True),
+             'val': Person(u'Valentina', u'Kerman', 30000, False)},
+             coll)
+
+
+    def test_load_changeaddremove(self):
+        """Add one item and remove another
+        """
+
+        # Load initial collection
+        ini = textwrap.dedent('''
+            [person:jeb]
+            firstname = Jebediah
+            lastname = Kerman
+            salary = 20000
+            male = True
+
+            [person:val]
+            firstname = Valentina
+            lastname = Kerman
+            salary = 30000
+            male = False
+        ''')
+
+        itemstore = lambda ctx: insist.ConfigurationStore.makeStore(
+            ctx, IPerson, 'test')
+        gsm = zope.component.getGlobalSiteManager()
+        gsm.registerAdapter(
+            itemstore, (IPerson, ), interfaces.IConfigurationStore, '')
+
+        coll = {}
+        store = PersonCollectionStore(coll)
+        store.loads(ini)
+
+        self.assertEqual(
+            {'jeb': Person(u'Jebediah', u'Kerman', 20000, True),
+             'val': Person(u'Valentina', u'Kerman', 30000, False)},
+             coll)
+
+        # Save loaded items for future reference
+
+        jeb = coll['jeb']
+        val = coll['val']
+
+        # Now let's change the configuration - remove one item and add another
+
+        ini = textwrap.dedent('''
+            [person:bill]
+            firstname = Bill
+            lastname = Kerman
+            salary = 30000
+            male = True
+
+            [person:val]
+            firstname = Valentina
+            lastname = Kerman
+            salary = 30000
+            male = False
+        ''')
+
+        store.loads(ini)
+        self.assertEqual(
+            {'bill': Person(u'Bill', u'Kerman', 30000, True),
+             'val': Person(u'Valentina', u'Kerman', 30000, False)},
+             coll)
+
+        bill = coll['bill']
+
+        # Make sure we didn't just edit "jeb", but created new item. Also, `val`
+        # should stay unchanged.
+        self.assertNotEqual(jeb, coll['bill'])
+        self.assertEqual(val, coll['val'])
+
+        # Now, change the salary of a bill, and remove val
+        ini = textwrap.dedent('''
+            [person:bill]
+            firstname = Bill
+            lastname = Kerman
+            salary = 50000
+            male = True
+        ''')
+
+        store.loads(ini)
+        self.assertEqual(
+            {'bill': Person(u'Bill', u'Kerman', 50000, True)},
+            coll)
+
+        # Bill should not change his identity by this operation
+        self.assertEqual(bill, coll['bill'])
+
+
+    def test_load_typed(self):
+        """Test collections with items of different types
+        """
+
+        # First, register adapters
+        gsm = zope.component.getGlobalSiteManager()
+
+        personstore = lambda ctx: insist.ConfigurationStore.makeStore(
+            ctx, IPerson, 'person')
+        gsm.registerAdapter(personstore, (IPerson, ),
+                            interfaces.IConfigurationStore, '')
+
+        companystore = lambda ctx: insist.ConfigurationStore.makeStore(
+            ctx, ICompany, 'company')
+        gsm.registerAdapter(companystore, (ICompany, ),
+                            interfaces.IConfigurationStore, '')
+
+        coll = {}
+        store = MixedClassCollectionStore(coll)
+
+        # Load initial data
+        ini = textwrap.dedent('''
+            [item:jeb]
+            type = person
+            firstname = Jebediah
+            lastname = Kerman
+            salary = 20000
+            male = True
+
+            [item:pp]
+            type = company
+            name = Pied Piper, Inc
+        ''')
+        store.loads(ini)
+
+        self.assertEqual(
+            {'jeb': Person(u'Jebediah', u'Kerman', 20000, True),
+             'pp': Company(u'Pied Piper, Inc')},
+             coll)
+
+        # Now, suddenly, jeb becomes a company
+
+        ini = textwrap.dedent('''
+            [item:jeb]
+            type = company
+            name = Jeb Startup, Inc
+
+            [item:pp]
+            type = company
+            name = Pied Piper, Inc
+        ''')
+        store.loads(ini)
+
+        self.assertEqual(
+            {'jeb': Company(u'Jeb Startup, Inc'),
+             'pp': Company(u'Pied Piper, Inc')},
+             coll)
+
+
+class ListFieldSerializerTest(InsistTest):
+    """Tuple and list fields are serialized as multiline values.
     """
 
+    def test_None(self):
+        """Check that None gets serialized and can be read back
+        """
+        class INumbers(zope.interface.Interface):
+            numbers = zope.schema.List(
+                value_type=zope.schema.Int())
 
-def doctest_DictFieldSerializer_edge_cases():
-    r"""
-    Dict fields get JSONified.
+        class Numbers(object):
+            numbers = None
 
-    Check what happens with None
+        nums = Numbers()
+        nums.numbers = [42, None]
+        store = insist.ConfigurationStore.makeStore(nums, INumbers, 'numbers')
 
-        >>> class IPerson(zope.interface.Interface):
-        ...     somedata = zope.schema.Dict(
-        ...         key_type=zope.schema.TextLine(),
-        ...         value_type=zope.schema.Int())
+        self.assertEqual(
+            ('[numbers]\n'
+             'numbers = 42, !!None\n\n'),
+             store.dumps())
 
-        >>> class Person(object):
-        ...     somedata = None
+    def test_double_escape(self):
+        """Well it gets double escaped... But it won't fail loading
+        """
+        class INumbers(zope.interface.Interface):
+            numbers = zope.schema.List(
+                value_type=zope.schema.Int())
 
-        >>> p = Person()
-        >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+        class Numbers(object):
+            numbers = None
 
-        >>> p.somedata = None
-        >>> print store.dumps()
-        [person]
-        somedata = !None
+        nums = Numbers()
+        nums.numbers = [42, None]
+        store = insist.ConfigurationStore.makeStore(nums, INumbers, 'numbers')
 
-        >>> p.somedata = OrderedDict([
-        ...     (u'foo', 42),
-        ...     (u'bar', None)])
-        >>> print store.dumps()
-        [person]
-        somedata = foo::42
-            bar::!!None
+        store.loads(textwrap.dedent('''
+            [numbers]
+            numbers = 42, !!None
+        '''))
 
-        >>> store.loads('''\
-        ... [person]
-        ... somedata = !None
-        ... ''')
-        >>> p.somedata is None
-        True
+        self.assertEqual([42, None], nums.numbers)
 
-        >>> store.loads('''\
-        ... [person]
-        ... somedata =
-        ... ''')
-        >>> p.somedata
-        {}
+        store.loads(textwrap.dedent('''
+            [numbers]
+            numbers =
+        '''))
+        self.assertEqual([], nums.numbers)
 
-    None in value_type:
+    def test_separator_in_item(self):
+        '''Check what happens when there\'s a separator in an item
+        '''
+        class ISomeTexts(zope.interface.Interface):
+            sometexts = zope.schema.List(
+                value_type=zope.schema.TextLine())
 
-        >>> store.loads('''\
-        ... [person]
-        ... somedata = bar::15
-        ...     foo::!!None
-        ... ''')
-        >>> sorted(p.somedata.items())
-        [(u'bar', 15), (u'foo', None)]
+        class SomeTexts(object):
+            sometexts = None
 
-    Some weirdos:
+        texts = SomeTexts()
+        texts.sometexts = [u'42', None, u', ', u'foo']
+        store = insist.ConfigurationStore.makeStore(
+            texts, ISomeTexts, 'sometexts')
 
-        >>> store.loads('''\
-        ... [person]
-        ... somedata = {}
-        ... ''')
-        Traceback (most recent call last):
-        ...
-        ValueError: need more than 1 value to unpack
+        self.assertEqual(
+            ('[sometexts]\n'
+             'sometexts = 42, !!None, , , foo\n\n'),
+             store.dumps())
 
-        >>> store.loads('''\
-        ... [person]
-        ... somedata = ::
-        ... ''')
-        Traceback (most recent call last):
-        ...
-        ValueError: invalid literal for int() with base 10: ''
+        store.loads(textwrap.dedent('''
+            [sometexts]
+            sometexts = 42, !!None, , , foo
+        '''))
 
-        >>> store.loads('''\
-        ... [person]
-        ... somedata = ::42
-        ... ''')
-        >>> p.somedata
-        {u'': 42}
+        # oooooooooops, that u', ' we sent in is gone... don't try this at home
 
-        >>> store.loads('''\
-        ... [person]
-        ... somedata =
-        ...     bar::42
-        ... ''')
-        >>> p.somedata
-        {u'bar': 42}
+        self.assertEqual(
+            [u'42', None, u'', u'', u'foo'],
+            texts.sometexts)
 
-    Separator in key_type or value_type fails
-    Choose your separator wisely
 
-        >>> store.loads('''\
-        ... [person]
-        ... somedata =
-        ...     ba::r::42
-        ... ''')
-        Traceback (most recent call last):
-        ...
-        ValueError: invalid literal for int() with base 10: 'r::42'
+    def test_list_value_type(self):
+        '''Let\'s see what happens is value_type is List
+        '''
+        class IPerson(zope.interface.Interface):
+            somedata = zope.schema.List(
+                value_type=zope.schema.Dict(
+                    key_type=zope.schema.TextLine(),
+                    value_type=zope.schema.TextLine()))
 
-    OrderedDict as factory:
+        class Person(object):
+            somedata = None
 
-        >>> save_factory = insist.DictFieldSerializer.factory
-        >>> insist.DictFieldSerializer.factory = OrderedDict
+        p = Person()
+        store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
 
-        >>> store.loads('''\
-        ... [person]
-        ... somedata = bar::42
-        ...     foo::666
-        ... ''')
+        p.somedata = [
+            collections.OrderedDict([
+                (u'first', u'foo')
+            ]),
+            collections.OrderedDict([
+              (u'second', u'bar'), (u'third', u'fun')
+            ]),
+        ]
+        self.assertEqual(
+            ('[person]\n'
+             'somedata = first::foo, second::bar\n'
+             '\tthird::fun\n\n'),
+             store.dumps())
 
-        >>> p.somedata
-        OrderedDict([(u'bar', 42), (u'foo', 666)])
+        store.loads(store.dumps())
+        self.assertEqual(
+            [{u'first': u'foo'}, {u'second': u'bar', u'third': u'fun'}],
+            p.somedata)
 
-        >>> store.loads('''\
-        ... [person]
-        ... somedata = foo::402
-        ...     bar::987
-        ... ''')
 
-        >>> p.somedata
-        OrderedDict([(u'foo', 402), (u'bar', 987)])
-
-        >>> insist.DictFieldSerializer.factory = save_factory
-
-    Date as value_type:
-
-        >>> class IPerson(zope.interface.Interface):
-        ...     somedata = zope.schema.Dict(
-        ...         key_type=zope.schema.TextLine(),
-        ...         value_type=zope.schema.Date())
-
-        >>> class Person(object):
-        ...     somedata = None
-
-        >>> p = Person()
-        >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
-
-        >>> p.somedata = {u'foo': datetime.date(2015, 11, 7), u'bar': None}
-        >>> print store.dumps()
-        [person]
-        somedata = foo::2015-11-07
-            bar::!!None
-
-        >>> store.loads('''\
-        ... [person]
-        ... somedata = !None
-        ... ''')
-        >>> p.somedata is None
-        True
-
-        >>> store.loads('''\
-        ... [person]
-        ... somedata =
-        ... ''')
-        >>> p.somedata
-        {}
-
-        >>> store.loads('''\
-        ... [person]
-        ... somedata = foo::2015-11-07
-        ...     bar::!!None
-        ... ''')
-        >>> sorted(p.somedata.items())
-        [(u'bar', None), (u'foo', datetime.date(2015, 11, 7))]
-
-    What happens when value_type does not conform?
-
-        >>> store.loads('''\
-        ... [person]
-        ... somedata = foo::42
-        ...     bar::!!None
-        ... ''')
-        Traceback (most recent call last):
-        ...
-        ValueError: time data '42' does not match format '%Y-%m-%d'
-
-    Let's see that unicode strings survive dump and load
-
-        >>> p.somedata = {u'foo\u07d0': None}
-        >>> store.loads(store.dumps())
-        >>> p.somedata
-        {u'foo\u07d0': None}
-
-    Let's see that \n and friends survive load and dump
-
-        >>> class IPerson(zope.interface.Interface):
-        ...     somedata = zope.schema.Dict(
-        ...         key_type=zope.schema.TextLine(),
-        ...         value_type=zope.schema.Text())
-
-        >>> class Person(object):
-        ...     somedata = None
-
-        >>> p = Person()
-        >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
-
-        >>> p.somedata = {u'foo': 'first\nsecond\rthird\ta tab'}
-        >>> print store.dumps()
-        [person]
-        somedata = foo::first\nsecond\rthird\ta tab
-
-        >>> store.loads(store.dumps())
-        >>> p.somedata
-        {u'foo': u'first\nsecond\rthird\ta tab'}
-
-    Let's see what happens is value_type is List
-
-        >>> class IPerson(zope.interface.Interface):
-        ...     somedata = zope.schema.Dict(
-        ...         key_type=zope.schema.TextLine(),
-        ...         value_type=zope.schema.List(
-        ...             value_type=zope.schema.TextLine()))
-
-        >>> class Person(object):
-        ...     somedata = None
-
-        >>> p = Person()
-        >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
-
-        >>> p.somedata = {u'foo': [u'first', u'second']}
-        >>> print store.dumps()
-        [person]
-        somedata = foo::first, second
-
-        >>> store.loads(store.dumps())
-        >>> p.somedata
-        {u'foo': [u'first', u'second']}
-
+class DictFieldSerializerTest(InsistTest):
+    """Dict fields get JSONified.
     """
 
+    def setUp(self):
+        super(DictFieldSerializerTest, self).setUp()
 
-def doctest_FieldSerializer_with_None_output():
-    r"""A field serialized to None signals exclusion of field.
+        class IPerson(zope.interface.Interface):
+            somedata = zope.schema.Dict(
+                key_type=zope.schema.TextLine(),
+                value_type=zope.schema.Int())
 
-        >>> class MyList(zope.schema.List):
-        ...     pass
+        class Person(object):
+            somedata = None
 
-        >>> @zope.component.adapter(MyList, zope.interface.Interface)
-        ... class MyListSerializer(insist.ListFieldSerializer):
-        ...     def serializeValueWithNone(self, value):
-        ...         if value is None or len(value) == 0:
-        ...             return None
-        ...         return super(MyListSerializer, self).serializeValueWithNone(value)
-        ...
-        ...     def serializeValue(self, value):
-        ...         if value is None or len(value) == 0:
-        ...             return None
-        ...         return super(MyListSerializer, self).serializeValue(value)
+        self.person = Person()
+        self.store = insist.ConfigurationStore.makeStore(
+            self.person, IPerson, 'person')
 
-        >>> zope.component.provideAdapter(MyListSerializer)
 
-        >>> class INumbers(zope.interface.Interface):
-        ...     numbers = MyList(
-        ...         value_type=zope.schema.Int(), required=False)
+    def test_None_foo(self):
+        """Check what happens with None
+        """
+        self.person.somedata = None
+        self.assertEqual(
+            ('[person]\n'
+             'somedata = !None\n\n'),
+             self.store.dumps())
 
-        >>> class Numbers(object):
-        ...     numbers = None
+        self.person.somedata = OrderedDict([
+            (u'foo', 42),
+            (u'bar', None)])
+        self.assertEqual(
+            ('[person]\n'
+             'somedata = foo::42\n'
+             '\tbar::!!None\n\n'),
+             self.store.dumps())
 
-        >>> nums = Numbers()
-        >>> nums.numbers = []
-        >>> store = insist.ConfigurationStore.makeStore(
-        ...     nums, INumbers, 'numbers')
-        >>> print store.dumps()
-        [numbers]
+        self.store.loads(textwrap.dedent('''
+            [person]
+            somedata = !None
+        '''))
+        self.assertIsNone(self.person.somedata)
 
-    """
+        self.store.loads(textwrap.dedent('''
+            [person]
+            somedata =
+        '''))
+        self.assertEqual({}, self.person.somedata)
+
+    def test_None_in_value_type(self):
+        """Check what happens with None in value type
+        """
+        self.store.loads(textwrap.dedent('''
+            [person]
+            somedata = bar::15
+                foo::!!None
+        '''))
+        self.assertEqual(
+            {u'bar': 15,
+             u'foo': None},
+            self.person.somedata)
+
+    def test_edge_cases(self):
+        """Check some strange edge cases
+        """
+        with self.assertRaises(ValueError):
+            self.store.loads(textwrap.dedent('''
+                [person]
+                somedata = {}
+            '''))
+
+        with self.assertRaises(ValueError):
+            self.store.loads(textwrap.dedent('''
+                [person]
+                somedata = ::
+            '''))
+
+        self.store.loads(textwrap.dedent('''
+             [person]
+             somedata = ::42
+        '''))
+        self.assertEqual({u'': 42}, self.person.somedata)
+
+        self.store.loads(textwrap.dedent('''
+             [person]
+             somedata =
+                 bar::42
+        '''))
+        self.assertEqual({u'bar': 42}, self.person.somedata)
+
+    def test_separator(self):
+        """Separator in key_type or value_type fails
+
+        Choose your separator wisely
+        """
+        with self.assertRaises(ValueError):
+            self.store.loads(textwrap.dedent('''
+                [person]
+                somedata =
+                    ba::r::42
+             '''))
+
+    def test_factory_OrderedDict(self):
+        '''OrderedDict as factory
+        '''
+        save_factory = insist.DictFieldSerializer.factory
+        insist.DictFieldSerializer.factory = OrderedDict
+
+        self.store.loads(textwrap.dedent('''
+             [person]
+             somedata =
+                 bar::42
+        '''))
+        self.assertEqual(
+            {u'bar': 42},
+            self.person.somedata)
+
+        self.store.loads(textwrap.dedent('''
+            [person]
+            somedata = bar::42
+                foo::666
+        '''))
+
+        self.assertEqual(
+            OrderedDict([(u'bar', 42), (u'foo', 666)]),
+            self.person.somedata)
+
+        self.store.loads(textwrap.dedent('''
+            [person]
+            somedata = foo::402
+                bar::987
+        '''))
+
+        self.assertEqual(
+            OrderedDict([(u'foo', 402), (u'bar', 987)]),
+            self.person.somedata)
+
+        insist.DictFieldSerializer.factory = save_factory
+
+    def test_value_type_Date(self):
+        '''Check Date as value_type'''
+
+        class IPerson(zope.interface.Interface):
+            somedata = zope.schema.Dict(
+                key_type=zope.schema.TextLine(),
+                value_type=zope.schema.Date())
+
+        class Person(object):
+            somedata = None
+
+        p = Person()
+        store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+
+        p.somedata = collections.OrderedDict([
+           (u'foo', datetime.date(2015, 11, 7)), (u'bar', None)
+        ])
+        self.assertEqual(
+            ('[person]\n'
+             'somedata = foo::2015-11-07\n'
+             '\tbar::!!None\n\n'),
+             store.dumps())
+
+        store.loads(textwrap.dedent('''
+            [person]
+            somedata = !None
+        '''))
+        self.assertIsNone(p.somedata)
+
+        store.loads(textwrap.dedent('''
+            [person]
+            somedata =
+        '''))
+        self.assertEqual({}, p.somedata)
+
+        store.loads(textwrap.dedent('''
+            [person]
+            somedata = foo::2015-11-07
+                bar::!!None
+        '''))
+        self.assertEqual(
+            {u'bar': None,
+             u'foo': datetime.date(2015, 11, 7)},
+            p.somedata)
+
+        # What happens when value_type does not conform?
+        with self.assertRaises(ValueError):
+            store.loads(textwrap.dedent('''
+                [person]
+                somedata = foo::42
+                    bar::!!None
+            '''))
+
+    def test_unicode_key_value(self):
+        '''Let\'s see that unicode strings survive dump and load.
+        '''
+        self.person.somedata = {u'foo\u07d0': None}
+        self.store.loads(self.store.dumps())
+        self.assertEqual(
+            {u'foo\u07d0': None},
+            self.person.somedata)
+
+    def test_newline(self):
+        '''Let\'s see that \n and friends survive load and dump.
+        '''
+        class IPerson(zope.interface.Interface):
+            somedata = zope.schema.Dict(
+                key_type=zope.schema.TextLine(),
+                value_type=zope.schema.Text())
+
+        class Person(object):
+            somedata = None
+
+        p = Person()
+        p.somedata = {u'foo': 'first\nsecond\rthird\ta tab'}
+        store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+
+        self.assertEqual(
+            ('[person]\n'
+             'somedata = foo::first\\nsecond\\rthird\\ta tab\n\n'),
+             store.dumps())
+
+        store.loads(store.dumps())
+        self.assertEqual(
+            {u'foo': u'first\nsecond\rthird\ta tab'},
+            p.somedata)
+
+    def test_value_type_List(self):
+        '''Let\'s see what happens is value_type is List
+        '''
+        class IPerson(zope.interface.Interface):
+            somedata = zope.schema.Dict(
+                key_type=zope.schema.TextLine(),
+                value_type=zope.schema.List(
+                    value_type=zope.schema.TextLine()))
+
+        class Person(object):
+            somedata = None
+
+        p = Person()
+        p.somedata = {u'foo': [u'first', u'second']}
+        store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
+
+        self.assertEqual(
+            ('[person]\n'
+             'somedata = foo::first, second\n\n'),
+             store.dumps())
+
+        store.loads(store.dumps())
+        self.assertEqual(
+            {u'foo': [u'first', u'second']},
+            p.somedata)
 
 
 def setUp(test):
@@ -1094,10 +1135,18 @@ def test_suite():
     optionflags=(doctest.NORMALIZE_WHITESPACE|
                  doctest.REPORT_NDIFF|
                  doctest.ELLIPSIS)
-    files = doctest.DocFileSuite(
-        '../insist.txt',
-        setUp=setUp, tearDown=tearDown, optionflags=optionflags)
-    tests = doctest.DocTestSuite(
-        setUp=setUp, tearDown=tearDown, optionflags=optionflags)
 
-    return unittest.TestSuite([files, tests])
+    return unittest.TestSuite([
+        doctest.DocFileSuite(
+            '../insist.txt',
+            setUp=setUp, tearDown=tearDown, optionflags=optionflags),
+        unittest.makeSuite(FieldSerializerTest),
+        unittest.makeSuite(ConfigurationStoreTest),
+        unittest.makeSuite(CollectionConfigurationStoreTest),
+        unittest.makeSuite(SeparateFileConfigurationStoreTest),
+        unittest.makeSuite(SeparateFileCollectionConfigurationStoreTest),
+        unittest.makeSuite(FileSectionsCollectionConfigurationStoreTest),
+        unittest.makeSuite(CollectionConfigStoreTest),
+        unittest.makeSuite(ListFieldSerializerTest),
+        unittest.makeSuite(DictFieldSerializerTest),
+    ])

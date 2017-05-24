@@ -1,13 +1,17 @@
-Change log
-----------
+Changelog
+=========
 
-1.0.1 (unreleased)
-~~~~~~~~~~~~~~~~~~
+1.1.0 (unreleased)
+------------------
 
-- Nothing changed yet.
+- Support for Python 3.5, 3.6 and PyPy.
+
+- Covnerted most doctests to unit tests to ease compatibility effort.
+
+- First public release.
 
 
 1.0.0 (2017-05-15)
-~~~~~~~~~~~~~~~~~~
+------------------
 
-* Initial release.
+- Initial release.

@@ -1,11 +1,10 @@
-bin/
-develop-eggs/
+.coverage
+.tox/
+coverage.xml
+dist/
+perf-data/
 ve/
-parts/
-.installed.cfg
-build/
 
 *.pyc
 src/*.egg-info
 
-perf-data/

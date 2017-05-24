@@ -27,7 +27,7 @@ object in an .ini file:
     >>> from z3c.insist import insist
     >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
     >>> state = store.dumps()
-    >>> print state
+    >>> print(state)
     [person]
     firstname = Albertas
     lastname = Agejevas
@@ -38,12 +38,14 @@ Similarly, the store can load the object state from a config file:
 
     >>> p.firstname = p.lastname = p.weight = p.yacht = None
     >>> store.loads(state)
-    >>> from pprint import pprint
-    >>> pprint(p.__dict__)
-    {'firstname': u'Albertas',
-     'lastname': u'Agejevas',
-     'weight': 42,
-     'yacht': None}
+    >>> print(p.firstname)
+    Albertas
+    >>> print(p.lastname)
+    Agejevas
+    >>> print(p.weight)
+    42
+    >>> print(p.yacht)
+    None
 
 
 Fields
@@ -52,7 +54,7 @@ Fields
 The store can provide an attribute with a list of fields to process:
 
     >>> store.fields = ('firstname', 'lastname')
-    >>> print store.dumps()
+    >>> print(store.dumps())
     [person]
     firstname = Albertas
     lastname = Agejevas
@@ -76,7 +78,7 @@ The store can have custom methods to load and dump particular fields:
     >>> def dump_lastname(value):
     ...     return value.upper()
     >>> store.dump_lastname = dump_lastname
-    >>> print store.dumps()
+    >>> print(store.dumps())
     [person]
     firstname = Albertas
     lastname = AGEJEVAS
@@ -89,8 +91,8 @@ The store can have custom methods to load and dump particular fields:
     ... firstname = Albertas
     ... lastname = AGEJEVAS
     ... """)
-    >>> p.lastname
-    'Agejevas'
+    >>> print(p.lastname)
+    Agejevas
 
 
 Choice fields
@@ -116,7 +118,7 @@ Let's set up a vocabulary and a schema using it:
     >>> papple = Apple()
 
     >>> store = insist.ConfigurationStore.makeStore(papple, IApple)
-    >>> print store.dumps()
+    >>> print(store.dumps())
     [IApple]
     color = green
 
@@ -131,7 +133,7 @@ When the value or the term is not in the vocabulary, the value converted to a
 string is used as the token:
 
     >>> papple.color = '#FFFF00'
-    >>> print store.dumps()
+    >>> print(store.dumps())
     [IApple]
     color = #FFFF00
 
@@ -139,8 +141,8 @@ string is used as the token:
     ... [IApple]
     ... color = lime
     ... """)
-    >>> papple.color
-    u'lime'
+    >>> print(papple.color)
+    lime
 
 
 Decimal fields
@@ -158,7 +160,7 @@ Decimal fields are serialized to/from strings pretty trivially
     >>> product = Product
     >>> store = insist.ConfigurationStore.makeStore(product, IProduct)
     >>> ini = store.dumps()
-    >>> print ini
+    >>> print(ini)
     [IProduct]
     price = 23.06
 
@@ -187,7 +189,7 @@ Tuple and list fields are serialized as multiline values.
     >>> cr = Crayons()
     >>> cr.colors = ['#0000FF', '#00FF00']
     >>> store = insist.ConfigurationStore.makeStore(cr, ICrayons, 'crayons')
-    >>> print store.dumps()
+    >>> print(store.dumps())
     [crayons]
     colors = blue, green
 
@@ -221,7 +223,7 @@ Date fields get stringified.
     >>> p.birthdate = datetime.date(1974, 12, 30)
 
     >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
-    >>> print store.dumps()
+    >>> print(store.dumps())
     [person]
     birthdate = 1974-12-30
 
@@ -248,7 +250,7 @@ Datetime fields get stringified.
     >>> foo.timestamp = datetime.datetime(2014, 4, 9, 9, 54, 42, 132)
 
     >>> store = insist.ConfigurationStore.makeStore(foo, IFoo, 'foo')
-    >>> print store.dumps()
+    >>> print(store.dumps())
     [foo]
     timestamp = 2014-04-09T09:54:42.000132
 
@@ -257,13 +259,13 @@ Datetime fields get stringified.
     >>> from pytz import UTC, timezone
 
     >>> foo.timestamp = datetime.datetime(2014, 4, 9, 9, 54, 42, 132, tzinfo=UTC)
-    >>> print store.dumps()
+    >>> print(store.dumps())
     [foo]
     timestamp = 2014-04-09T09:54:42.000132+00:00
 
     >>> foo.timestamp = datetime.datetime(2014, 4, 9, 9, 54, 42, 132,
     ...     tzinfo=timezone('CET'))
-    >>> print store.dumps()
+    >>> print(store.dumps())
     [foo]
     timestamp = 2014-04-09T09:54:42.000132+01:00
 
@@ -307,14 +309,14 @@ Dict fields are serialized as multiline values.
     >>> store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
 
     >>> p.somedata = {}
-    >>> print store.dumps()
+    >>> print(store.dumps())
     [person]
     somedata =
 
     >>> p.somedata = OrderedDict((
     ...     (u'foo', 42),
     ...     (u'bar', 555)))
-    >>> print store.dumps()
+    >>> print(store.dumps())
     [person]
     somedata = foo::42
       bar::555
@@ -331,5 +333,7 @@ Dict fields are serialized as multiline values.
     ... somedata = bar::15
     ...     foo::999
     ... """)
-    >>> sorted(p.somedata.items())
-    [(u'bar', 15), (u'foo', 999)]
+    >>> p.somedata['bar']
+    15
+    >>> p.somedata['foo']
+    999

@@ -3,23 +3,32 @@
 # Copyright 2013-15 by Shoobx, Inc.
 #
 ###############################################################################
-"""z3c.insist -- Persistence to ini files"""
-import ConfigParser
+"""z3c.insist -- Persistence to ini files
+"""
+import configparser
 import datetime
 import decimal
+import glob
+import hashlib
+import iso8601
 import json
 import logging
-import hashlib
-import glob
 import os
-from cStringIO import StringIO
-
-import iso8601
-import zope.schema
+import sys
 import zope.component
+import zope.schema
 from zope.schema import vocabulary
 
+
 from z3c.insist import interfaces
+
+PY3 = sys.version_info.major >= 3
+
+if PY3:
+    unicode = str
+    from io import StringIO
+else:
+    from cStringIO import StringIO
 
 
 class FilesystemMixin(object):
@@ -40,7 +49,7 @@ class FilesystemMixin(object):
         return open(path, mode)
 
     def hashFile(self, filename):
-        with self.openFile(filename) as f:
+        with self.openFile(filename, 'rb') as f:
             hsh = hashlib.sha256(f.read())
         return hsh.hexdigest()
 
@@ -97,7 +106,7 @@ class ConfigurationStore(object):
 
     def _createConfigParser(self, config=None):
         if config is None:
-            config = ConfigParser.RawConfigParser()
+            config = configparser.RawConfigParser()
             config.optionxform = str
         return config
 
@@ -147,7 +156,7 @@ class ConfigurationStore(object):
         for fn, field in self._get_fields():
             if self.fields is not None and fn not in self.fields:
                 continue
-            # XXX: __name__ is a special for RawConfigParser
+            # XXX: __name__ is special for RawConfigParser
             #      http://bugs.python.org/msg215809
             if not config.has_section(self.section):
                 continue
@@ -170,9 +179,9 @@ class ConfigurationStore(object):
                 self.context))
 
     def loads(self, cfgstr):
-        buf = StringIO(cfgstr)
         config = self._createConfigParser()
-        config.readfp(buf)
+        # Mostly ensure for Py2 that we actually pass in a unicode string.
+        config.read_string(unicode(cfgstr))
         self.load(config)
 
 class CollectionConfigurationStore(ConfigurationStore):
@@ -231,7 +240,7 @@ class CollectionConfigurationStore(ConfigurationStore):
         for k, v in self.context.items():
             __traceback_info__ = (k, v)
             store = self._createItemConfigStore(
-                v, config, self.section_prefix + unicode(k).encode('utf-8'))
+                v, config, self.section_prefix + k)
             store.dump(config)
         return config
 
@@ -553,10 +562,10 @@ class BytesFieldSerializer(FieldSerializer):
     zope.schema.interfaces.IText, zope.interface.Interface)
 class TextFieldSerializer(FieldSerializer):
     def serializeValue(self, value):
-        return value.encode('utf-8')
+        return value
 
     def deserializeValue(self, value):
-        return unicode(value, 'utf-8')
+        return value
 
 
 @zope.component.adapter(
@@ -769,15 +778,11 @@ class DictFieldSerializer(FieldSerializer):
 
     def _encodeString(self, value):
         # drive string through json, to encode eventual \n and stuff
-        res = json.dumps(value)[1:-1]
-        return res
+        return json.dumps(value)[1:-1]
 
     def _decodeString(self, value):
         # drive string through json, to decode eventual \n and stuff
-        res = json.loads('"' + value + '"')
-        # encode: we definitely sent utf-8 str in with _encodeString but json
-        #         will return unicode, some serializers don't like that
-        return res.encode('utf8')
+        return json.loads('"' + value + '"')
 
     def serializeValue(self, value):
         results = []

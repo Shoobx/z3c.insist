@@ -1,21 +1,14 @@
 PYTHON = python2.7
 
-
-all: bin/test
-
-bootstrap.py:
-	wget http://downloads.buildout.org/2/bootstrap.py
+all: ve ve/bin/zope-testrunner
 
 ve:
 	virtualenv -p $(PYTHON) ve
+	ve/bin/pip install -e .[enforce,test]
 
-bin/buildout: ve bootstrap.py
-	ve/bin/pip install --upgrade setuptools
-	ve/bin/python bootstrap.py
+ve/bin/zope-testrunner:
+	ve/bin/pip install zope.testrunner
 
-bin/test: bin/buildout buildout.cfg setup.py versions.cfg
-	bin/buildout
-	touch bin/test
-
-test: bin/test
-	bin/test
+.PHONY: test
+test: ve/bin/zope-testrunner
+	ve/bin/zope-testrunner --test-path=${PWD}/src

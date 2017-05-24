@@ -1,5 +1,6 @@
 include *.rst
-include buildout.cfg
-include versions.cfg
+include Makefile
+
 recursive-include src *.py
+recursive-include src *.txt
 recursive-include src *.zcml

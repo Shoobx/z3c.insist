@@ -238,7 +238,7 @@ class Enforcer(watchdog.observers.Observer):
             if path in self.path2HandlerCache:
                 try:
                     self.path2HandlerCache[path].dispatch(event)
-                except Exception, err:
+                except Exception as err:
                     # Handle all exceptions that happen whilel handling the
                     # event and continue.
                     logger.exception('Exception while handling event.')
@@ -250,7 +250,7 @@ class Enforcer(watchdog.observers.Observer):
                 if handler in self._handlers.get(watch, []):
                     try:
                         handled = handler.dispatch(event)
-                    except Exception, err:
+                    except Exception as err:
                         # Handle all exceptions that happen whilel handling the
                         # event and continue.
                         logger.exception('Exception while handling event.')
