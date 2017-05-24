@@ -4,8 +4,10 @@ Changelog
 1.1.2 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Ensure that we always load files in a way that its content is automatically
+  converted to unicode.
 
+- Ensure that MANIFEST is complete.
 
 1.1.1 (2017-05-24)
 ------------------
