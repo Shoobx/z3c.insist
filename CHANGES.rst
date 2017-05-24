@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.1.2 (unreleased)
+1.1.2 (2017-05-24)
 ------------------
 
 - Ensure that we always load files in a way that its content is automatically
