@@ -4,7 +4,7 @@ Changelog
 1.1.1 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Added badges to README.
 
 
 1.1.0 (2017-05-24)
