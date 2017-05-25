@@ -539,6 +539,28 @@ class FileSectionsCollectionConfigurationStoreTest(InsistTest):
 
         self.assertEqual(orig_hash, new_hash)
 
+    def test_getSectionFromPath(self):
+        import tempfile
+        dir = tempfile.mkdtemp()
+
+        class SimpleCollectionStore(
+                insist.FileSectionsCollectionConfigurationStore):
+
+            schema = ISimple
+            section_prefix = 'simple:'
+            item_factory = Simple
+
+            def getConfigPath(self):
+                return dir
+
+        store = SimpleCollectionStore({})
+
+        path = os.path.join(dir, 'simple:section_name.ini')
+        with open(path, 'w') as file:
+            file.write('')
+
+        self.assertEqual('simple:section_name', store.getSectionFromPath(path))
+
 
 class CollectionConfigStoreTest(InsistTest):
 

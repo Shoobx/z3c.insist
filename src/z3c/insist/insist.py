@@ -467,7 +467,6 @@ class FileSectionsCollectionConfigurationStore(
         return os.path.join(self.getConfigPath(), section + self.filePostfix)
 
     def getSectionFromPath(self, path):
-        config = ConfigParser
         dirname, section_name = os.path.split(path)
         while '.' in section_name:
             section_name = section_name.rsplit('.', 1)[0]
