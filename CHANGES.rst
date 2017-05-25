@@ -4,7 +4,12 @@ Changelog
 1.1.3 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fixed a bug in reading the config files.
+
+- Switched to modern ``io.open()`` which supports the ``encoding``
+  parameter.
+
+- Make sure that Bytes are properly converted in both directions.
 
 
 1.1.2 (2017-05-24)
