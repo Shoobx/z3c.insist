@@ -552,10 +552,10 @@ class FieldSerializer(object):
     zope.schema.interfaces.IBytes, zope.interface.Interface)
 class BytesFieldSerializer(FieldSerializer):
     def serializeValue(self, value):
-        return value
+        return value.decode('utf-8')
 
     def deserializeValue(self, value):
-        return value
+        return value.encode('utf-8')
 
 
 @zope.component.adapter(
