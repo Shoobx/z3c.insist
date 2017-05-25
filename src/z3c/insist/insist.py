@@ -10,6 +10,7 @@ import datetime
 import decimal
 import glob
 import hashlib
+import io
 import iso8601
 import json
 import logging
@@ -45,8 +46,8 @@ class FilesystemMixin(object):
             return None
         return os.path.getmtime(path)
 
-    def openFile(self, path, mode='r'):
-        return open(path, mode)
+    def openFile(self, path, mode='r', encoding=None):
+        return io.open(path, mode, encoding=encoding)
 
     def hashFile(self, filename):
         with self.openFile(filename, 'rb') as f:
