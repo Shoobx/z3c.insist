@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.1.3 (unreleased)
+1.1.3 (2017-05-25)
 ------------------
 
 - Fixed a bug in reading the config files.
