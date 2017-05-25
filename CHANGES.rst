@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.1.4 (unreleased)
+1.1.4 (2017-05-25)
 ------------------
 
 - Fixed a senseless bug that was caused by the Py3 port.
