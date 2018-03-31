@@ -412,7 +412,7 @@ class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
         else:
             self.subConfig = self._createConfigParser()
             with self.openFile(configPath, 'r') as fle:
-                self.subConfig.readfp(fle)
+                self.subConfig.read_file(fle)
         # 3. Load as usual from the sub-config.
         self._loadSubConfig(self.subConfig)
 
@@ -495,7 +495,7 @@ class FileSectionsCollectionConfigurationStore(
         if section not in self.section_configs:
             config = self._createConfigParser()
             with self.openFile(self.getSectionPath(section), 'r') as file:
-                config.readfp(file)
+                config.read_file(file)
             self.section_configs[section] = config
         return self.section_configs[section]
 
