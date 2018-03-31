@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.2.0 (unreleased)
+1.2.0 (2018-03-31)
 ------------------
 
 - Use `ConfigParser.read_file()` instead of `ConfigParser.readfp()`, since the
