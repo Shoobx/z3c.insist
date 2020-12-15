@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.2.1 (unreleased)
+1.3.0 (2020-12-15)
 ------------------
 
 - Dropped support for Python 2 and Python 3.5
