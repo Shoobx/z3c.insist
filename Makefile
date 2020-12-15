@@ -1,4 +1,4 @@
-PYTHON = python2.7
+PYTHON ?= python3.6
 
 all: ve ve/bin/zope-testrunner
 
