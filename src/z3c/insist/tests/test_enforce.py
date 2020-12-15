@@ -152,7 +152,10 @@ class EnforcerTest(EnforcerBaseTest):
         evt = enf.dispatch_events(
             EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')), 1)
         self.assertEqual(
-            "<FileModifiedEvent: src_path='./sample.ini'>\n",
+            "<FileModifiedEvent:"
+            " event_type=modified,"
+            " src_path='./sample.ini',"
+            " is_directory=False>\n",
             self.log.getvalue())
 
         # Now we are locking the directory, ...
@@ -171,7 +174,10 @@ class EnforcerTest(EnforcerBaseTest):
         enf.dispatch_events(
             EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')), 1)
         self.assertEqual(
-            "<FileModifiedEvent: src_path='./sample.ini'>\n",
+            "<FileModifiedEvent:"
+            " event_type=modified,"
+            " src_path='./sample.ini',"
+            " is_directory=False>\n",
             self.log.getvalue())
 
 
