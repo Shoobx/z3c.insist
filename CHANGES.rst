@@ -4,7 +4,8 @@ Changelog
 1.2.1 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Dropped support for Python 2 and Python 3.5
+- Added support for Python 3.8
 
 
 1.2.0 (2018-03-31)

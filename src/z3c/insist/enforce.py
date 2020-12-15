@@ -13,7 +13,7 @@ import watchdog.observers
 import watchdog.utils
 import zope.component
 import zope.interface
-from pathtools.patterns import match_any_paths
+from watchdog.utils.patterns import match_any_paths
 
 from z3c.insist import interfaces, insist
 
@@ -49,7 +49,7 @@ class EnforcerEventHandler(watchdog.events.FileSystemEventHandler):
         return factory.fromRootAndFilename(self.root, path)
 
     def getStoreFromEvent(self, event):
-        path = watchdog.utils.unicode_paths.decode(event.src_path)
+        path = os.fsdecode(event.src_path)
 
         if match_any_paths([path],
                            included_patterns=self.patterns,
