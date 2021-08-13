@@ -1,9 +1,11 @@
-PYTHON ?= python3.6
+PYTHON ?= python3.9
 
 all: ve ve/bin/zope-testrunner
 
 ve:
-	virtualenv -p $(PYTHON) ve
+	$(PYTHON) -m venv ve; \
+	  ve/bin/pip install --upgrade setuptools; \
+	  ve/bin/pip install --upgrade wheel
 	ve/bin/pip install -e .[enforce,test]
 
 ve/bin/zope-testrunner:
