@@ -223,7 +223,7 @@ class ConfigurationStoreTest(InsistTest):
 
 
     def test_file_header(self):
-        """The configurations tore can also place a file header on top
+        """The configurations store can also place a file header on top
         of the file.
         """
         obj = NoneTestObject()
@@ -234,66 +234,6 @@ class ConfigurationStoreTest(InsistTest):
         # Nones and bangs get escaped:
         self.assertTrue(
             store.dumps().startswith('# Nice file header'))
-
-
-class CollectionConfigurationStoreTest(InsistTest):
-    """Collection Configuration Store Tests
-
-    This configuration store orchestrates storage of
-    collections/mappings. To make the collection store usable a
-    few attributes and methods must be provided:
-    """
-
-    def test_component(self):
-
-        class SimpleCollectionStore(insist.CollectionConfigurationStore):
-            schema = ISimple
-            section_prefix = 'simple:'
-            item_factory = Simple
-
-        # We also have to register a store for the object itself:
-
-        @zope.component.adapter(ISimple)
-        @zope.interface.implementer(interfaces.IConfigurationStore)
-        class SimpleStore(insist.ConfigurationStore):
-            schema = ISimple
-
-        reg = zope.component.provideAdapter(SimpleStore)
-
-        # Now, let's create a simple collection and create a store for it:
-
-        coll = collections.OrderedDict([
-            ('one', Simple(u'Number 1')),
-            ('two', Simple(u'Two is a charm')),
-            ('three', Simple(u'The tail.'))
-            ])
-
-        store = SimpleCollectionStore(coll)
-
-        # Let's have a look at the dump:
-
-        self.assertEqual(
-            ('[simple:one]\n'
-             'text = Number 1\n'
-             '\n'
-             '[simple:two]\n'
-             'text = Two is a charm\n'
-             '\n'
-             '[simple:three]\n'
-             'text = The tail.\n\n'),
-             store.dumps())
-
-        # Now let's test the roundtrip:
-
-        coll2 = {}
-        store2 = SimpleCollectionStore(coll2)
-        store2.loads(store.dumps())
-
-        self.assertEqual(
-            {'one': Simple('Number 1'),
-             'three': Simple('The tail.'),
-             'two': Simple('Two is a charm')},
-            coll2)
 
 
 class SeparateFileConfigurationStoreTest(InsistTest):
@@ -406,7 +346,7 @@ class SeparateFileCollectionConfigurationStoreTest(InsistTest):
         class SimpleStore(insist.ConfigurationStore):
             schema = ISimple
 
-        reg = zope.component.provideAdapter(SimpleStore)
+        zope.component.provideAdapter(SimpleStore)
 
         # Now, let's create a simple collection and create a store for it:
 
@@ -482,7 +422,7 @@ class FileSectionsCollectionConfigurationStoreTest(InsistTest):
             def getConfigPath(self):
                 return dir
 
-        reg = zope.component.provideAdapter(SimpleStore)
+        zope.component.provideAdapter(SimpleStore)
 
         # Okay, now things are getting exciting. Let's dump a collection
         # and see what happens:
@@ -562,8 +502,65 @@ class FileSectionsCollectionConfigurationStoreTest(InsistTest):
         self.assertEqual('simple:section_name', store.getSectionFromPath(path))
 
 
-class CollectionConfigStoreTest(InsistTest):
+class CollectionConfigurationStoreTest(InsistTest):
+    """Collection Configuration Store Tests
 
+    This configuration store orchestrates storage of
+    collections/mappings. To make the collection store usable a
+    few attributes and methods must be provided:
+    """
+
+    def test_component(self):
+
+        class SimpleCollectionStore(insist.CollectionConfigurationStore):
+            schema = ISimple
+            section_prefix = 'simple:'
+            item_factory = Simple
+
+        # We also have to register a store for the object itself:
+
+        @zope.component.adapter(ISimple)
+        @zope.interface.implementer(interfaces.IConfigurationStore)
+        class SimpleStore(insist.ConfigurationStore):
+            schema = ISimple
+
+        zope.component.provideAdapter(SimpleStore)
+
+        # Now, let's create a simple collection and create a store for it:
+
+        coll = collections.OrderedDict([
+            ('one', Simple(u'Number 1')),
+            ('two', Simple(u'Two is a charm')),
+            ('three', Simple(u'The tail.'))
+            ])
+
+        store = SimpleCollectionStore(coll)
+
+        # Let's have a look at the dump:
+
+        self.assertEqual(
+            ('[simple:one]\n'
+             'text = Number 1\n'
+             '\n'
+             '[simple:two]\n'
+             'text = Two is a charm\n'
+             '\n'
+             '[simple:three]\n'
+             'text = The tail.\n\n'),
+             store.dumps())
+
+        # Now let's test the roundtrip:
+
+        coll2 = {}
+        store2 = SimpleCollectionStore(coll2)
+        store2.loads(store.dumps())
+
+        self.assertEqual(
+            {'one': Simple('Number 1'),
+             'three': Simple('The tail.'),
+             'two': Simple('Two is a charm')},
+            coll2)
+    
     def test_dump(self):
         """Collections can be stored semi-automatically
         """
@@ -592,7 +589,6 @@ class CollectionConfigStoreTest(InsistTest):
              'salary = 30000\n'
              'male = False\n\n'),
              store.dumps())
-
 
     def test_load_fresh(self):
         """Load completely new collection
@@ -626,7 +622,6 @@ class CollectionConfigStoreTest(InsistTest):
             {'jeb': Person(u'Jebediah', u'Kerman', 20000, True),
              'val': Person(u'Valentina', u'Kerman', 30000, False)},
              coll)
-
 
     def test_load_changeaddremove(self):
         """Add one item and remove another
@@ -713,7 +708,6 @@ class CollectionConfigStoreTest(InsistTest):
         # Bill should not change his identity by this operation
         self.assertEqual(bill, coll['bill'])
 
-
     def test_load_typed(self):
         """Test collections with items of different types
         """
@@ -771,6 +765,70 @@ class CollectionConfigStoreTest(InsistTest):
             {'jeb': Company(u'Jeb Startup, Inc'),
              'pp': Company(u'Pied Piper, Inc')},
              coll)
+
+    def test_load_missing_attribute(self):
+        """Make sure missing attributes stay defaults on existing objects
+        """
+
+        # Load initial collection
+        ini = textwrap.dedent('''
+            [person:jeb]
+            firstname = Jebediah
+            lastname = Kerman
+            salary = 20000
+            male = True
+
+            [person:val]
+            firstname = Valentina
+            lastname = Kerman
+            salary = 30000
+            male = False
+        ''')
+
+        itemstore = lambda ctx: insist.ConfigurationStore.makeStore(
+            ctx, IPerson, 'test')
+        gsm = zope.component.getGlobalSiteManager()
+        gsm.registerAdapter(
+            itemstore, (IPerson, ), interfaces.IConfigurationStore, '')
+
+        coll = {}
+        store = PersonCollectionStore(coll)
+        store.loads(ini)
+
+        self.assertEqual(
+            {'jeb': Person(u'Jebediah', u'Kerman', 20000, True),
+             'val': Person(u'Valentina', u'Kerman', 30000, False)},
+             coll)
+
+        jeb = coll['jeb']
+
+        # Now let's change the configuration
+        # - change jeb firstname and omit lastname
+
+        ini = textwrap.dedent('''
+            [person:jeb]
+            firstname = Joe
+            salary = 30000
+            male = True
+
+            [person:val]
+            firstname = Valentina
+            lastname = Kerman
+            salary = 30000
+            male = False
+        ''')
+
+        # We still use the SAME store, SAME collection
+        store.loads(ini)
+
+        # The result needs to be that attributes unset in the ini "stay"
+        # as the default of the object would be
+        # Definitely do not pick up the previous object value!
+        self.assertEqual(
+            {'jeb': Person(u'Joe', None, 30000, True),
+             'val': Person(u'Valentina', u'Kerman', 30000, False)},
+             coll)
+        self.assertEqual(jeb, coll['jeb'])
 
 
 class ListFieldSerializerTest(InsistTest):
@@ -1168,7 +1226,6 @@ def test_suite():
         unittest.makeSuite(SeparateFileConfigurationStoreTest),
         unittest.makeSuite(SeparateFileCollectionConfigurationStoreTest),
         unittest.makeSuite(FileSectionsCollectionConfigurationStoreTest),
-        unittest.makeSuite(CollectionConfigStoreTest),
         unittest.makeSuite(ListFieldSerializerTest),
         unittest.makeSuite(DictFieldSerializerTest),
     ])
