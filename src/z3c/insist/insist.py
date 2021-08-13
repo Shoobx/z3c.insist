@@ -331,7 +331,7 @@ class CollectionConfigurationStore(ConfigurationStore):
         if existing:
             newobj = self._createNewItem(config, section)
             if newobj.__class__ is not obj.__class__:
-                # Yeah, class have changed, let's replace the item
+                # Yeah, class has changed, let's replace the item
                 self.deleteItem(name)
                 obj = newobj
                 existing = False
