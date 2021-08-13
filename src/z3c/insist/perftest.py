@@ -132,7 +132,7 @@ class PerformanceTest(object):
         main_ini = os.path.join(DATA_DIRECTORY, 'main.ini')
 
         # 1. Dump data.
-        print collectionFactory.__name__, 'Dump...'
+        print(collectionFactory.__name__, 'Dump...')
         dump_start = time.time()
         config = store.dump()
         with open(main_ini, 'w') as file:
@@ -140,7 +140,7 @@ class PerformanceTest(object):
         dump_end = time.time()
 
         # 2. Load data.
-        print collectionFactory.__name__, 'Load...'
+        print(collectionFactory.__name__, 'Load...')
         data2 = collections.OrderedDict()
         store2 = collectionFactory(data2)
         load_start = time.time()
@@ -151,7 +151,7 @@ class PerformanceTest(object):
         load_end = time.time()
 
         # 3. Update data.
-        print collectionFactory.__name__, 'Update...'
+        print(collectionFactory.__name__, 'Update...')
         # Modify the original data.
         updateCallable()
         # Now update previously loaded data.
@@ -178,7 +178,7 @@ class PerformanceTest(object):
         for name, res in self.results.items():
             fmt_res = ['%0.3fs' % e for e in res]
             pt.add_row([name] + fmt_res)
-        print pt
+        print(pt)
 
     def run(self):
         data = self.generateData()
@@ -196,7 +196,7 @@ parser.add_argument(
     help="Increase verbosity of the output.")
 parser.add_argument(
     '-q', '--quiet', dest='verbose', action='store_const', const=0,
-    help="Print nothing")
+    help="Print(nothing")
 
 
 def main(args=sys.argv[1:]):

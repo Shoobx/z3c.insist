@@ -6,6 +6,7 @@ Changelog
 
 - Dropped support for Python 3.6
 - Added support for Python 3.9
+- Applied zopefoundation.meta config
 
 
 1.3.0 (2020-12-15)

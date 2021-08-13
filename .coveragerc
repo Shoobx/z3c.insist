@@ -1,3 +1,0 @@
-[run]
-include = */z3c/insist/*
-omit = */test*

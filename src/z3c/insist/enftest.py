@@ -9,10 +9,9 @@ import collections
 import logging
 import os
 import sys
-import time
 import zope.component
 import zope.interface
-from z3c.insist import insist, enforce, interfaces, perftest, testing
+from z3c.insist import enforce, perftest, testing
 
 
 class INumbers(zope.interface.Interface):
@@ -42,10 +41,10 @@ class EnforcerTest(object):
     def generateData(self):
         self.data = collections.OrderedDict()
         for number in range(self.amount):
-            self.data[unicode(number)] = perftest.NumberObject(number)
+            self.data[str(number)] = perftest.NumberObject(number)
 
     def dumpData(self):
-        print 'Dumping data into ...', perftest.DATA_DIRECTORY
+        print('Dumping data into ...', perftest.DATA_DIRECTORY)
         store = perftest.FileItemsCollectionStore(self.data)
         main_ini = os.path.join(perftest.DATA_DIRECTORY, 'main.ini')
         config = store.dump()
@@ -56,19 +55,19 @@ class EnforcerTest(object):
     def printItem(self, number):
         obj = self.data.get(number)
         if obj is None:
-            print 'No item found.'
+            print('No item found.')
             return
-        print obj.name
-        print '-' * len(obj.name)
-        print 'Number:', obj.number
-        print 'Is Even:', obj.isEven
-        print 'Date:', obj.date
-        print 'Repeated Text:', obj.repeatedText
+        print(obj.name)
+        print('-' * len(obj.name))
+        print('Number:', obj.number)
+        print('Is Even:', obj.isEven)
+        print('Date:', obj.date)
+        print('Repeated Text:', obj.repeatedText)
 
     def run(self):
         self.setUp()
         self.generateData()
-        store = self.dumpData()
+        self.dumpData()
 
         enforcer = enforce.Enforcer(perftest.DATA_DIRECTORY, self.data)
         enforcer.registerHandlers()
@@ -76,8 +75,8 @@ class EnforcerTest(object):
 
         try:
             while True:
-                number = raw_input('Number: ')
-                if number is 'q':
+                number = input('Number: ')
+                if number == 'q':
                     enforcer.stop()
                     break
                 self.printItem(number)
