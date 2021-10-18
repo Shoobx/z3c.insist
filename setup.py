@@ -37,6 +37,7 @@ setup(
     '\n\n' +
     read_file('CHANGES.rst'),
     keywords="configuration dump serialization",
+    url='http://pypi.python.org/pypi/z3c.insist',
     license='Proprietary',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
