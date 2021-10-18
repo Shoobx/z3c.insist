@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.4.0 (unreleased)
+1.4.0 (2021-10-18)
 ------------------
 
 - Implemented ability to include config files for file-based stores.
