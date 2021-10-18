@@ -15,21 +15,14 @@ import iso8601
 import json
 import logging
 import os
-import sys
+import re
 import zope.component
 import zope.schema
 from zope.schema import vocabulary
 
-
 from z3c.insist import interfaces
 
-PY3 = sys.version_info.major >= 3
-
-if PY3:
-    unicode = str
-    from io import StringIO
-else:
-    from cStringIO import StringIO
+RE_INCLUDES = r'^#include (\S*)'
 
 
 class FilesystemMixin(object):
@@ -149,7 +142,7 @@ class ConfigurationStore(object):
 
     def dumps(self):
         config = self.dump()
-        buf = StringIO()
+        buf = io.StringIO()
         self.write(config, buf)
         return buf.getvalue()
 
@@ -181,9 +174,9 @@ class ConfigurationStore(object):
 
     def loads(self, cfgstr):
         config = self._createConfigParser()
-        # Mostly ensure for Py2 that we actually pass in a unicode string.
-        config.read_string(unicode(cfgstr))
+        config.read_string(cfgstr)
         self.load(config)
+
 
 class CollectionConfigurationStore(ConfigurationStore):
     """A configuration store for collections.
@@ -365,6 +358,13 @@ class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
     def getConfigFilename(self):
         return self.section + '.ini'
 
+    def getIncludes(self, cfgstr):
+        basePath = self.getConfigPath()
+        return [
+            os.path.normpath(os.path.join(basePath, include))
+            for include in re.findall(RE_INCLUDES, cfgstr, re.MULTILINE)
+        ]
+
     def _dumpSubConfig(self, config):
         super(SeparateFileConfigurationStoreMixIn, self).dump(config)
 
@@ -391,6 +391,13 @@ class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
 
         return config
 
+    def _readSubConfig(self, configPath):
+        with self.openFile(configPath, 'r') as fle:
+            cfgstr = fle.read()
+        includes = self.getIncludes(cfgstr)
+        self.subConfig.read(includes)
+        self.subConfig.read_string(cfgstr)
+
     def _loadSubConfig(self, config):
         super(SeparateFileConfigurationStoreMixIn, self).load(config)
 
@@ -411,8 +418,7 @@ class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
             self.subConfig = config
         else:
             self.subConfig = self._createConfigParser()
-            with self.openFile(configPath, 'r') as fle:
-                self.subConfig.read_file(fle)
+            self._readSubConfig(configPath)
         # 3. Load as usual from the sub-config.
         self._loadSubConfig(self.subConfig)
 
@@ -673,7 +679,7 @@ class ChoiceFieldSerializer(FieldSerializer):
             # The term does not exist any more. Since in most cases the for
             # user-defined vocabularies the value == token, we'll just return
             # the str'ed value.
-            return unicode(value)
+            return str(value)
 
 
 class SequenceFieldSerializer(FieldSerializer):

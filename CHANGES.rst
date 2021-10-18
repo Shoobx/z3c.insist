@@ -4,15 +4,29 @@ Changelog
 1.4.0 (unreleased)
 ------------------
 
+- Implemented ability to include config files for file-based stores.
+
+  + Syntax: ```#include path/to/included.ini```
+
+  + A new `IncludeObserver` component listens to the changes of the included
+    files and will update the config of the including file on
+    modification. Added and removing new included files is also supported.
+
 - Dropped support for Python 3.6
+
 - Added support for Python 3.9
+
+- Removed last compatibility code with Python 2.
+
 - Applied zopefoundation.meta config
+
 
 
 1.3.0 (2020-12-15)
 ------------------
 
 - Dropped support for Python 2 and Python 3.5
+
 - Added support for Python 3.8
 
 

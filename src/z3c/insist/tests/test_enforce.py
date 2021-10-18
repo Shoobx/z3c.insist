@@ -7,14 +7,15 @@
 
 Test fixture.
 """
-from __future__ import print_function
-
 import doctest
 import io
 import logging
 import mock
 import os
+import pathlib
 import sys
+import tempfile
+import time
 import unittest
 import watchdog.events
 import zope.component
@@ -23,26 +24,36 @@ from watchdog.observers.api import ObservedWatch
 
 from z3c.insist import enforce, insist, interfaces, testing
 
-PY3 = sys.version_info.major >= 3
-
-if PY3:
-    _u = str
-else:
-    _u = unicode
 
 test_logger = logging.getLogger(__name__)
+
+
+class ISimple(zope.interface.Interface):
+    text = zope.schema.Text()
+
+
+@zope.interface.implementer(ISimple)
+class Simple(object):
+    def __init__(self, text=None):
+        self.text = text
+
+    def __repr__(self):
+        return 'Simple(%r)' % self.text
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.text == other.text
 
 
 class SampleHandler(watchdog.events.FileSystemEventHandler):
 
     def on_modified(self, event):
-        test_logger.info(_u(event))
+        test_logger.info(str(event))
 
     def on_created(self, event):
-        test_logger.info(_u(event))
+        test_logger.info(str(event))
 
     def on_deleted(self, event):
-        test_logger.info(_u(event))
+        test_logger.info(str(event))
 
 
 class EventQueue(object):
@@ -170,7 +181,7 @@ class EnforcerTest(EnforcerBaseTest):
         enf.dispatch_events(
             EventQueue(watchdog.events.FileDeletedEvent('./lock')), 1)
 
-        self.log.__init__(u'')
+        self.log.__init__('')
         enf.dispatch_events(
             EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')), 1)
         self.assertEqual(
@@ -180,14 +191,160 @@ class EnforcerTest(EnforcerBaseTest):
             " is_directory=False>\n",
             self.log.getvalue())
 
+    def test_included(self):
 
-class EnforcerFileSectionsCollectionStore(EnforcerBaseTest):
+        baseDir = tempfile.mkdtemp('-base')
+
+        basePath = os.path.join(baseDir, 'simple-collection.ini')
+        with open(basePath, 'w') as file:
+            file.write(
+                '[simple:one]\n'
+                'text = One\n'
+                '\n'
+                '[simple:two]\n'
+                'text = Two\n'
+            )
+
+        confDir = tempfile.mkdtemp('-conf')
+
+        simplePath = os.path.join(confDir, 'simple-collection.ini')
+        with open(simplePath, 'w') as file:
+            file.write(
+                f'#include {basePath}\n'
+                '[simple:two]\n'
+                'text = 2\n'
+                '\n'
+                '[simple:three]\n'
+                'text = 3\n'
+            )
+
+        coll = {}
+
+        @zope.component.adapter(dict)
+        @zope.interface.implementer_only(interfaces.IConfigurationStore)
+        class SimpleCollectionStore(
+                insist.SeparateFileCollectionConfigurationStore,
+                enforce.EnforcerFileSectionsCollectionStore
+        ):
+
+            section = 'simple-collection'
+            schema = ISimple
+            section_prefix = 'simple:'
+            item_factory = Simple
+
+            def getConfigPath(self):
+                return confDir
+
+            @classmethod
+            def fromRootAndFilename(cls, root, filename=None):
+                return cls(coll)
+
+        zope.component.provideAdapter(SimpleCollectionStore)
+
+        @zope.component.adapter(ISimple)
+        @zope.interface.implementer(interfaces.IConfigurationStore)
+        class SimpleStore(insist.ConfigurationStore):
+            dumpSectionStub = False
+            schema = ISimple
+
+            def getConfigPath(self):
+                return confDir
+
+        zope.component.provideAdapter(SimpleStore)
+
+        enf = enforce.Enforcer(confDir, coll)
+        enf.registerHandlers()
+        enf.start()
+
+        inc = enforce.IncludeObserver(confDir)
+        inc.initialize()
+        inc.start()
+
+        # Load the configuration when the main config file is modified.
+        pathlib.Path(simplePath).touch()
+        time.sleep(0.01)
+        self.assertEqual(len(coll), 3)
+        self.assertEqual(coll['one'].text, 'One')
+        self.assertEqual(coll['two'].text, '2')
+        self.assertEqual(coll['three'].text, '3')
+
+        # Configuration should also be loaded when the base config file is
+        # updated.
+        with open(basePath, 'w') as file:
+            file.write(
+                '[simple:one]\n'
+                'text = 1\n'
+            )
+        time.sleep(0.01)
+        self.assertEqual(len(coll), 3)
+        self.assertEqual(coll['one'].text, '1')
+
+        # Add a new base file.
+        baseDir2 = tempfile.mkdtemp('-base2')
+        basePath2 = os.path.join(baseDir2, 'simple-collection.ini')
+        with open(basePath2, 'w') as file:
+            file.write(
+                '[simple:four]\n'
+                'text = Four\n'
+            )
+        with open(simplePath, 'w') as file:
+            file.write(
+                f'#include {basePath}\n'
+                f'#include {basePath2}\n'
+                '[simple:two]\n'
+                'text = 2\n'
+                '\n'
+                '[simple:three]\n'
+                'text = 3\n'
+            )
+        time.sleep(0.01)
+
+        self.assertEqual(len(coll), 4)
+        self.assertEqual(coll['one'].text, '1')
+        self.assertEqual(coll['two'].text, '2')
+        self.assertEqual(coll['three'].text, '3')
+        self.assertEqual(coll['four'].text, 'Four')
+
+        # Modify the newly added base.
+        with open(basePath2, 'w') as file:
+            file.write(
+                '[simple:four]\n'
+                'text = 4\n'
+            )
+        time.sleep(0.01)
+        self.assertEqual(coll['four'].text, '4')
+
+        # Remove second base.
+        with open(simplePath, 'w') as file:
+            file.write(
+                f'#include {basePath}\n'
+                '[simple:two]\n'
+                'text = 2\n'
+                '\n'
+                '[simple:three]\n'
+                'text = 3\n'
+            )
+        os.remove(basePath2)
+        time.sleep(0.01)
+
+        self.assertEqual(len(coll), 3)
+        self.assertEqual(coll['one'].text, '1')
+        self.assertEqual(coll['two'].text, '2')
+        self.assertEqual(coll['three'].text, '3')
+
+        inc.stop()
+        inc.join()
+        enf.stop()
+        enf.join()
+
+
+class EnforcerFileSectionsCollectionStoreTest(EnforcerBaseTest):
     """Enforcer File Sections Collection Store Tests
     """
 
     def test_component(self):
         # This small mix-in class provides the necessary functions for
-        # a store to work the enforcer. So let's say I have this
+        # a store to work ,vb   the enforcer. So let's say I have this
         # simple store:
         class NumbersStore(enforce.EnforcerFileSectionsCollectionStore):
             section = 'numbers'
@@ -267,7 +424,7 @@ class EnforcerEventHandlerTest(EnforcerBaseTest):
             handler.dispatch(evt)
 
 
-class FileSectionsEnforcerEventHandler(EnforcerBaseTest):
+class FileSectionsEnforcerEventHandlerTest(EnforcerBaseTest):
     """File Sections Enforcer Event Handler
     """
 
@@ -388,8 +545,8 @@ class SeparateFileEnforcerEventHandlerTest(EnforcerBaseTest):
 def test_suite():
     return unittest.TestSuite([
         unittest.makeSuite(EnforcerTest),
-        unittest.makeSuite(EnforcerFileSectionsCollectionStore),
+        unittest.makeSuite(EnforcerFileSectionsCollectionStoreTest),
         unittest.makeSuite(EnforcerEventHandlerTest),
-        unittest.makeSuite(FileSectionsEnforcerEventHandler),
+        unittest.makeSuite(FileSectionsEnforcerEventHandlerTest),
         unittest.makeSuite(SeparateFileEnforcerEventHandlerTest),
     ])

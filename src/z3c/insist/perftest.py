@@ -20,7 +20,7 @@ import zope.schema
 
 from z3c.insist import interfaces, insist, testing
 
-TO_BE_REPEATED = u'Some nice text.\n'
+TO_BE_REPEATED = 'Some nice text.\n'
 
 DATA_DIRECTORY = os.path.join(os.curdir, 'perf-data')
 
@@ -162,7 +162,7 @@ class PerformanceTest(object):
             config.readfp(file)
         store2.load(config)
         update_end = time.time()
-        assert data2['0'].repeatedText == u'Modified'
+        assert data2['0'].repeatedText == 'Modified'
 
         zope.component.testing.tearDown(None)
 

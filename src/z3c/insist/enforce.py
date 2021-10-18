@@ -5,8 +5,12 @@
 ###############################################################################
 """Module implementing a file listener to config changes.
 """
+import collections
+import dataclasses
 import logging
 import os
+import pathlib
+import re
 import time
 import watchdog.events
 import watchdog.observers
@@ -251,7 +255,7 @@ class Enforcer(watchdog.observers.Observer):
                     try:
                         handled = handler.dispatch(event)
                     except Exception as err:
-                        # Handle all exceptions that happen whilel handling the
+                        # Handle all exceptions that happen while handling the
                         # event and continue.
                         logger.exception('Exception while handling event.')
                         handled = True
@@ -260,3 +264,176 @@ class Enforcer(watchdog.observers.Observer):
                         self.path2HandlerCache[path] = handler
                         break
         event_queue.task_done()
+
+
+class IncludingFilesHandler(watchdog.events.FileSystemEventHandler):
+    """Including File Event Handler.
+
+    This handler listens for changes to any watched config (`*.ini`) files to
+    check whether any included files changed. If the `#include` statements in
+    an config file change, then the `IncludeOserver` is updated appropriately.
+    """
+    patterns = ['*/*.ini']
+    ignore_patterns = [
+        '*/.#*.*',  # Emacs temporary files
+        '*/.*~',     # Vim temporary files
+        '*/*.swp',  # Vim temporary files
+        ]
+    case_sensitive = True
+
+    def __init__(self, incObserver):
+        self.incObserver = incObserver
+
+    def dispatch(self, event):
+        print('-'*78)
+        print(event)
+        if event.is_directory:
+            return
+
+        if match_any_paths([os.fsdecode(event.src_path)],
+                           included_patterns=self.patterns,
+                           excluded_patterns=self.ignore_patterns,
+                           case_sensitive=self.case_sensitive):
+            super().dispatch(event)
+
+    def on_modified(self, event):
+        self.incObserver.update(event.src_path)
+
+    def on_created(self, event):
+        self.incObserver.update(event.src_path)
+
+    def on_deleted(self, event):
+        self.incObserver.update(event.src_path)
+
+
+class IncludedFilesHandler(watchdog.events.FileSystemEventHandler):
+    """Included File Event Handler
+
+    An event handler that tracks all included files and will touch to the
+    including file upon changes. The touch will in return cause the proper
+    handler for the including file to be called.
+
+    This algorithm is not 100% fool proof as it would not listen to changes of
+    involved non-config files.
+    """
+
+    def __init__(self, incObserver):
+        self.incObserver = incObserver
+
+    def dispatch(self, event):
+        if pathlib.Path(event.src_path) not in self.incObserver.includedFiles:
+            return
+        super().dispatch(event)
+
+    def on_modified(self, event):
+        included = self.incObserver.includedFiles[pathlib.Path(event.src_path)]
+        for filepath in included:
+            # Touch the including file which will trigger the enforcer to run
+            # the update handler.
+            logger.info(
+                f'Included file in "{filepath}" changed. '
+                'Touch file to trigger update.')
+            pathlib.Path(filepath).touch()
+
+    def on_deleted(self, event):
+        logger.error(
+            'Included File cannot be deleted: %s', event.src_path)
+
+
+class IncludeObserver(watchdog.observers.Observer):
+
+    watchedDir: str
+
+    # A mapping of included files to watched files.
+    includedFiles: collections.defaultdict
+    # A mapping of watched files to included files.
+    watchedFiles: collections.defaultdict
+    # A mapping of directories that contain include files to watched files
+    # that reference the directory. This is needed to know when a directory
+    # should be scheduled or unscheduled.
+    includeDirs: collections.defaultdict
+    # Watches for included directories.
+    watches: dict
+
+    EventHandler = IncludedFilesHandler
+
+    def __init__(self, watchedDir: str, context=None):
+        self.watchedDir = watchedDir
+        self.includedFiles = collections.defaultdict(lambda: set())
+        self.watchedFiles = collections.defaultdict(lambda: set())
+        self.includeDirs = collections.defaultdict(lambda: set())
+        self.watches = {}
+        super().__init__()
+
+    def initialize(self) -> None:
+        logger.info(f'Initializing Include Oberver for {self.watchedDir}')
+        for path in pathlib.Path(self.watchedDir).rglob('*.ini'):
+            self.update(path)
+        self.schedule(
+            IncludingFilesHandler(self),
+            path=self.watchedDir, recursive=True)
+
+    def update(
+            self,
+            watchedPath: str
+    ) -> None:
+        # Convert file path to proper Path object.
+        path = pathlib.Path(watchedPath)
+        # 1. Enumerate the included files. If the file does not exist, skip
+        #    it. It is commonly due to the deletion of the ini file.
+        includes = []
+        if path.exists():
+            with open(path, 'r') as fp:
+                cfgstr = fp.read()
+            includes = set([
+                pathlib.Path(path.parent, include).resolve()
+                for include in re.findall(
+                        insist.RE_INCLUDES, cfgstr, re.MULTILINE)
+            ])
+        logger.debug(
+            f'Updating include observer: {watchedPath} '
+            f'includes {[str(inc) for inc in includes]}')
+
+        # 2. Determine the added and removed include files by comparing the
+        #    old and new lists.
+        addedIncludes = includes - self.watchedFiles[path]
+        removedIncludes = self.watchedFiles[path] - includes
+
+        # 3. Update the state for each newly included file.
+        for added in addedIncludes:
+            # 3.1. Update the `includedFiles` index.
+            self.includedFiles[added].add(path)
+            # 3.2. Update the `includeDirs` state and schedule a "watch" for
+            #      the directory if necessary, so we can pick up changes to
+            #      the included file.
+            addedDir = added.parent
+            # 3.2.1. If this is the first time we see the included directory,
+            #        schedule the event listener and record the watcher.
+            if not self.includeDirs[addedDir]:
+                logger.debug(
+                    f'Start watching include dir: {addedDir}')
+                self.watches[addedDir] = self.schedule(
+                    self.EventHandler(self),
+                    path=str(addedDir), recursive=False)
+            # 3.2.2. Update the `includeDirs` state.
+            self.includeDirs[addedDir].add(added)
+
+        # 4. Update the state for each removed included file.
+        for removed in removedIncludes:
+            # 4.1. Update the `includedFiles` index.
+            self.includedFiles[removed].remove(path)
+            # 4.2. Update the `includeDirs` state and remove the "watch" for
+            #      the directory if no more files require listening.
+            removedDir = removed.parent
+            # 4.2.1. Update the `includeDirs` state.
+            self.includeDirs[removedDir].add(removed)
+            # 4.2.2. If the last file in a directory was removed, then the
+            #        watch for that directory can removed as well.
+            if not self.includeDirs[removedDir]:
+                logger.debug(
+                    f'Stop watching include dir: {removedDir}')
+                self.unschedule(self.watches[removedDir])
+                del self.watches[removedDir]
+
+        # 5. Update the `watchedFiles` state with the new list of includes.
+        self.watchedFiles[path] = includes

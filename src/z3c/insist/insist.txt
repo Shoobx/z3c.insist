@@ -314,8 +314,8 @@ Dict fields are serialized as multiline values.
     somedata =
 
     >>> p.somedata = OrderedDict((
-    ...     (u'foo', 42),
-    ...     (u'bar', 555)))
+    ...     ('foo', 42),
+    ...     ('bar', 555)))
     >>> print(store.dumps())
     [person]
     somedata = foo::42

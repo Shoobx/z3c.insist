@@ -7,13 +7,12 @@
 
 Test fixture.
 """
-from __future__ import print_function
-
 import collections
 import datetime
 import doctest
 import os
 import pprint
+import tempfile
 import textwrap
 import unittest
 from collections import OrderedDict
@@ -151,9 +150,9 @@ class FieldSerializerTest(InsistTest):
         # Now let's test the roundtrip:
         store.loads(store.dumps())
 
-        self.assertEqual(u'!None', obj.test1)
+        self.assertEqual('!None', obj.test1)
         self.assertIsNone(obj.test2)
-        self.assertEqual(u'To infinity! And beyond!', obj.test3)
+        self.assertEqual('To infinity! And beyond!', obj.test3)
         self.assertIsNone(obj.test4)
 
     def test_with_None_output(self):
@@ -204,9 +203,9 @@ class ConfigurationStoreTest(InsistTest):
             'test1 = foo\n'
         )
 
-        self.assertEqual(u'foo', obj.test1)
+        self.assertEqual('foo', obj.test1)
         self.assertIsNone(obj.test2)
-        self.assertEqual(u'To infinity! And beyond!', obj.test3)
+        self.assertEqual('To infinity! And beyond!', obj.test3)
         self.assertIsNone(obj.test4)
 
     def test_section(self):
@@ -263,9 +262,9 @@ class CollectionConfigurationStoreTest(InsistTest):
         # Now, let's create a simple collection and create a store for it:
 
         coll = collections.OrderedDict([
-            ('one', Simple(u'Number 1')),
-            ('two', Simple(u'Two is a charm')),
-            ('three', Simple(u'The tail.'))
+            ('one', Simple('Number 1')),
+            ('two', Simple('Two is a charm')),
+            ('three', Simple('The tail.'))
             ])
 
         store = SimpleCollectionStore(coll)
@@ -305,7 +304,6 @@ class SeparateFileConfigurationStoreTest(InsistTest):
     """
 
     def test_component(self):
-        import tempfile
         dir = tempfile.mkdtemp()
 
         class NoneTestStore(insist.SeparateFileConfigurationStore):
@@ -338,14 +336,14 @@ class SeparateFileConfigurationStoreTest(InsistTest):
 
         # Let's now load the data again:
         obj2 = NoneTestObject()
-        obj2.test1 = obj2.test2 = obj2.test3 = u'Test'
+        obj2.test1 = obj2.test2 = obj2.test3 = 'Test'
         obj2.test4 = 5
         store2 = NoneTestStore.makeStore(obj2, INoneTestSchema, 'test')
 
         store2.loads(store.dumps())
-        self.assertEqual(u'!None', obj2.test1)
+        self.assertEqual('!None', obj2.test1)
         self.assertIsNone(obj2.test2)
-        self.assertEqual(u'To infinity! And beyond!', obj2.test3)
+        self.assertEqual('To infinity! And beyond!', obj2.test3)
         self.assertIsNone(obj2.test4)
 
         # We can also tell the store not to leave the stub in the main config
@@ -363,7 +361,7 @@ class SeparateFileConfigurationStoreTest(InsistTest):
         self.assertEqual([], os.listdir(dir))
 
         obj3 = NoneTestObject()
-        obj3.test1 = obj3.test2 = obj3.test3 = u'Test'
+        obj3.test1 = obj3.test2 = obj3.test3 = 'Test'
         store3 = NoneTestStore.makeStore(obj3, INoneTestSchema, 'test')
 
         store3.loads(
@@ -373,10 +371,43 @@ class SeparateFileConfigurationStoreTest(InsistTest):
             'test3 = To infinity!! And beyond!!\n'
             'test4 = !None\n\n')
 
-        self.assertEqual(u'!None', obj3.test1)
+        self.assertEqual('!None', obj3.test1)
         self.assertIsNone(obj3.test2)
-        self.assertEqual(u'To infinity! And beyond!', obj3.test3)
+        self.assertEqual('To infinity! And beyond!', obj3.test3)
         self.assertIsNone(obj3.test4)
+
+    def test_load_withIncludes(self):
+        dir = tempfile.mkdtemp()
+
+        with open(os.path.join(dir, 'base.ini'), 'w') as file:
+            file.write(
+                '[test]\n'
+                'test1 = 1\n'
+                'test2 = 2\n'
+            )
+
+        with open(os.path.join(dir, 'test.ini'), 'w') as file:
+            file.write(
+                '#include base.ini\n'
+                '[test]\n'
+                'test2 = b\n'
+                'test3 = c\n'
+            )
+
+        class NoneTestStore(insist.SeparateFileConfigurationStore):
+            def getConfigPath(self):
+                return dir
+
+        obj = NoneTestObject()
+        obj.test1 = obj.test2 = obj.test3 = None
+        store = NoneTestStore.makeStore(obj, INoneTestSchema, 'test')
+        store.loads(
+            '[test]\n'
+            'config-file = test.ini\n\n'
+        )
+        self.assertEqual(obj.test1, '1')
+        self.assertEqual(obj.test2, 'b')
+        self.assertEqual(obj.test3, 'c')
 
 
 class SeparateFileCollectionConfigurationStoreTest(InsistTest):
@@ -411,9 +442,9 @@ class SeparateFileCollectionConfigurationStoreTest(InsistTest):
         # Now, let's create a simple collection and create a store for it:
 
         coll = collections.OrderedDict([
-            ('one', Simple(u'Number 1')),
-            ('two', Simple(u'Two is a charm')),
-            ('three', Simple(u'The tail.'))
+            ('one', Simple('Number 1')),
+            ('two', Simple('Two is a charm')),
+            ('three', Simple('The tail.'))
             ])
 
         store = SimpleCollectionStore(coll)
@@ -442,10 +473,62 @@ class SeparateFileCollectionConfigurationStoreTest(InsistTest):
         store2.loads(store.dumps())
 
         self.assertEqual(
-            {'one': Simple(u'Number 1'),
-             'three': Simple(u'The tail.'),
-             'two': Simple(u'Two is a charm')},
+            {'one': Simple('Number 1'),
+             'three': Simple('The tail.'),
+             'two': Simple('Two is a charm')},
              coll2)
+
+    def test_load_withIncludes(self):
+        import tempfile
+        dir = tempfile.mkdtemp()
+
+        with open(os.path.join(dir, 'base.ini'), 'w') as file:
+            file.write(
+                '[simple:one]\n'
+                'text = One\n'
+                '\n'
+                '[simple:two]\n'
+                'text = Two\n'
+            )
+
+        with open(os.path.join(dir, 'simple-collection.ini'), 'w') as file:
+            file.write(
+                '#include base.ini\n'
+                '[simple:two]\n'
+                'text = 2\n'
+                '\n'
+                '[simple:three]\n'
+                'text = 3\n'
+            )
+
+        class SimpleCollectionStore(
+                insist.SeparateFileCollectionConfigurationStore):
+
+            section = 'simple-collection'
+            schema = ISimple
+            section_prefix = 'simple:'
+            item_factory = Simple
+
+            def getConfigPath(self):
+                return dir
+
+        @zope.component.adapter(ISimple)
+        @zope.interface.implementer(interfaces.IConfigurationStore)
+        class SimpleStore(insist.ConfigurationStore):
+            schema = ISimple
+
+        reg = zope.component.provideAdapter(SimpleStore)
+
+        coll = {}
+        store = SimpleCollectionStore(coll)
+        store.loads(
+            '[simple-collection]\n'
+            'config-file = simple-collection.ini\n\n'
+        )
+        self.assertEqual(len(coll), 3)
+        self.assertEqual(coll['one'].text, 'One')
+        self.assertEqual(coll['two'].text, '2')
+        self.assertEqual(coll['three'].text, '3')
 
 
 class FileSectionsCollectionConfigurationStoreTest(InsistTest):
@@ -459,8 +542,6 @@ class FileSectionsCollectionConfigurationStoreTest(InsistTest):
     def test_component(self):
         # Let's setup a collection store with its file object store
         # that does not dump the stub.
-
-        import tempfile
         dir = tempfile.mkdtemp()
 
         class SimpleCollectionStore(
@@ -487,9 +568,9 @@ class FileSectionsCollectionConfigurationStoreTest(InsistTest):
         # Okay, now things are getting exciting. Let's dump a collection
         # and see what happens:
         coll = collections.OrderedDict([
-            ('one', Simple(u'Number 1')),
-            ('two', Simple(u'Two is a charm')),
-            ('three', Simple(u'The tail.'))
+            ('one', Simple('Number 1')),
+            ('two', Simple('Two is a charm')),
+            ('three', Simple('The tail.'))
             ])
 
         store = SimpleCollectionStore(coll)
@@ -517,9 +598,9 @@ class FileSectionsCollectionConfigurationStoreTest(InsistTest):
         store2.loads(store.dumps())
 
         self.assertEqual(
-            {'one': Simple(u'Number 1'),
-             'three': Simple(u'The tail.'),
-             'two': Simple(u'Two is a charm')},
+            {'one': Simple('Number 1'),
+             'three': Simple('The tail.'),
+             'two': Simple('Two is a charm')},
              coll2)
 
         # Also, the config hash of any item is determined by the mod time of
@@ -539,8 +620,59 @@ class FileSectionsCollectionConfigurationStoreTest(InsistTest):
 
         self.assertEqual(orig_hash, new_hash)
 
+    def test_load_withIncludes(self):
+        dir = tempfile.mkdtemp()
+
+        with open(os.path.join(dir, 'base.ini'), 'w') as file:
+            file.write(
+                '[simple:one]\n'
+                'text = One\n'
+                '\n'
+                '[simple:two]\n'
+                'text = Two\n'
+            )
+
+        with open(os.path.join(dir, 'simple-collection.ini'), 'w') as file:
+            file.write(
+                '#include base.ini\n'
+                '[simple:two]\n'
+                'text = 2\n'
+                '\n'
+                '[simple:three]\n'
+                'text = 3\n'
+            )
+
+        class SimpleCollectionStore(
+                insist.SeparateFileCollectionConfigurationStore):
+
+            section = 'simple-collection'
+            schema = ISimple
+            section_prefix = 'simple:'
+            item_factory = Simple
+
+            def getConfigPath(self):
+                return dir
+
+        @zope.component.adapter(ISimple)
+        @zope.interface.implementer(interfaces.IConfigurationStore)
+        class SimpleStore(insist.ConfigurationStore):
+            dumpSectionStub = False
+            schema = ISimple
+
+            def getConfigPath(self):
+                return dir
+
+        reg = zope.component.provideAdapter(SimpleStore)
+
+        coll = {}
+        store = SimpleCollectionStore(coll)
+        store.loads('')
+        self.assertEqual(len(coll), 3)
+        self.assertEqual(coll['one'].text, 'One')
+        self.assertEqual(coll['two'].text, '2')
+        self.assertEqual(coll['three'].text, '3')
+
     def test_getSectionFromPath(self):
-        import tempfile
         dir = tempfile.mkdtemp()
 
         class SimpleCollectionStore(
@@ -569,8 +701,8 @@ class CollectionConfigStoreTest(InsistTest):
         """
 
         coll = OrderedDict([
-            (u'jeb', Person(u"Jebediah", u"Kerman", 20000, True)),
-            (u'val', Person(u"Valentina", u"Kerman", 30000, False)),
+            ('jeb', Person(u"Jebediah", u"Kerman", 20000, True)),
+            ('val', Person(u"Valentina", u"Kerman", 30000, False)),
         ])
         itemstore = lambda ctx: insist.ConfigurationStore.makeStore(
             ctx, IPerson, 'test')
@@ -623,8 +755,8 @@ class CollectionConfigStoreTest(InsistTest):
         store.loads(ini)
 
         self.assertEqual(
-            {'jeb': Person(u'Jebediah', u'Kerman', 20000, True),
-             'val': Person(u'Valentina', u'Kerman', 30000, False)},
+            {'jeb': Person('Jebediah', 'Kerman', 20000, True),
+             'val': Person('Valentina', 'Kerman', 30000, False)},
              coll)
 
 
@@ -658,8 +790,8 @@ class CollectionConfigStoreTest(InsistTest):
         store.loads(ini)
 
         self.assertEqual(
-            {'jeb': Person(u'Jebediah', u'Kerman', 20000, True),
-             'val': Person(u'Valentina', u'Kerman', 30000, False)},
+            {'jeb': Person('Jebediah', 'Kerman', 20000, True),
+             'val': Person('Valentina', 'Kerman', 30000, False)},
              coll)
 
         # Save loaded items for future reference
@@ -685,8 +817,8 @@ class CollectionConfigStoreTest(InsistTest):
 
         store.loads(ini)
         self.assertEqual(
-            {'bill': Person(u'Bill', u'Kerman', 30000, True),
-             'val': Person(u'Valentina', u'Kerman', 30000, False)},
+            {'bill': Person('Bill', 'Kerman', 30000, True),
+             'val': Person('Valentina', 'Kerman', 30000, False)},
              coll)
 
         bill = coll['bill']
@@ -707,7 +839,7 @@ class CollectionConfigStoreTest(InsistTest):
 
         store.loads(ini)
         self.assertEqual(
-            {'bill': Person(u'Bill', u'Kerman', 50000, True)},
+            {'bill': Person('Bill', 'Kerman', 50000, True)},
             coll)
 
         # Bill should not change his identity by this operation
@@ -750,8 +882,8 @@ class CollectionConfigStoreTest(InsistTest):
         store.loads(ini)
 
         self.assertEqual(
-            {'jeb': Person(u'Jebediah', u'Kerman', 20000, True),
-             'pp': Company(u'Pied Piper, Inc')},
+            {'jeb': Person('Jebediah', 'Kerman', 20000, True),
+             'pp': Company('Pied Piper, Inc')},
              coll)
 
         # Now, suddenly, jeb becomes a company
@@ -768,8 +900,8 @@ class CollectionConfigStoreTest(InsistTest):
         store.loads(ini)
 
         self.assertEqual(
-            {'jeb': Company(u'Jeb Startup, Inc'),
-             'pp': Company(u'Pied Piper, Inc')},
+            {'jeb': Company('Jeb Startup, Inc'),
+             'pp': Company('Pied Piper, Inc')},
              coll)
 
 
@@ -834,7 +966,7 @@ class ListFieldSerializerTest(InsistTest):
             sometexts = None
 
         texts = SomeTexts()
-        texts.sometexts = [u'42', None, u', ', u'foo']
+        texts.sometexts = ['42', None, ', ', 'foo']
         store = insist.ConfigurationStore.makeStore(
             texts, ISomeTexts, 'sometexts')
 
@@ -848,10 +980,10 @@ class ListFieldSerializerTest(InsistTest):
             sometexts = 42, !!None, , , foo
         '''))
 
-        # oooooooooops, that u', ' we sent in is gone... don't try this at home
+        # oooooooooops, that ', ' we sent in is gone... don't try this at home
 
         self.assertEqual(
-            [u'42', None, u'', u'', u'foo'],
+            ['42', None, '', '', 'foo'],
             texts.sometexts)
 
 
@@ -872,10 +1004,10 @@ class ListFieldSerializerTest(InsistTest):
 
         p.somedata = [
             collections.OrderedDict([
-                (u'first', u'foo')
+                ('first', 'foo')
             ]),
             collections.OrderedDict([
-              (u'second', u'bar'), (u'third', u'fun')
+              ('second', 'bar'), ('third', 'fun')
             ]),
         ]
         self.assertEqual(
@@ -886,7 +1018,7 @@ class ListFieldSerializerTest(InsistTest):
 
         store.loads(store.dumps())
         self.assertEqual(
-            [{u'first': u'foo'}, {u'second': u'bar', u'third': u'fun'}],
+            [{'first': 'foo'}, {'second': 'bar', 'third': 'fun'}],
             p.somedata)
 
 
@@ -920,8 +1052,8 @@ class DictFieldSerializerTest(InsistTest):
              self.store.dumps())
 
         self.person.somedata = OrderedDict([
-            (u'foo', 42),
-            (u'bar', None)])
+            ('foo', 42),
+            ('bar', None)])
         self.assertEqual(
             ('[person]\n'
              'somedata = foo::42\n'
@@ -949,8 +1081,8 @@ class DictFieldSerializerTest(InsistTest):
                 foo::!!None
         '''))
         self.assertEqual(
-            {u'bar': 15,
-             u'foo': None},
+            {'bar': 15,
+             'foo': None},
             self.person.somedata)
 
     def test_edge_cases(self):
@@ -972,14 +1104,14 @@ class DictFieldSerializerTest(InsistTest):
              [person]
              somedata = ::42
         '''))
-        self.assertEqual({u'': 42}, self.person.somedata)
+        self.assertEqual({'': 42}, self.person.somedata)
 
         self.store.loads(textwrap.dedent('''
              [person]
              somedata =
                  bar::42
         '''))
-        self.assertEqual({u'bar': 42}, self.person.somedata)
+        self.assertEqual({'bar': 42}, self.person.somedata)
 
     def test_separator(self):
         """Separator in key_type or value_type fails
@@ -1005,7 +1137,7 @@ class DictFieldSerializerTest(InsistTest):
                  bar::42
         '''))
         self.assertEqual(
-            {u'bar': 42},
+            {'bar': 42},
             self.person.somedata)
 
         self.store.loads(textwrap.dedent('''
@@ -1015,7 +1147,7 @@ class DictFieldSerializerTest(InsistTest):
         '''))
 
         self.assertEqual(
-            OrderedDict([(u'bar', 42), (u'foo', 666)]),
+            OrderedDict([('bar', 42), ('foo', 666)]),
             self.person.somedata)
 
         self.store.loads(textwrap.dedent('''
@@ -1025,7 +1157,7 @@ class DictFieldSerializerTest(InsistTest):
         '''))
 
         self.assertEqual(
-            OrderedDict([(u'foo', 402), (u'bar', 987)]),
+            OrderedDict([('foo', 402), ('bar', 987)]),
             self.person.somedata)
 
         insist.DictFieldSerializer.factory = save_factory
@@ -1045,7 +1177,7 @@ class DictFieldSerializerTest(InsistTest):
         store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
 
         p.somedata = collections.OrderedDict([
-           (u'foo', datetime.date(2015, 11, 7)), (u'bar', None)
+           ('foo', datetime.date(2015, 11, 7)), ('bar', None)
         ])
         self.assertEqual(
             ('[person]\n'
@@ -1071,8 +1203,8 @@ class DictFieldSerializerTest(InsistTest):
                 bar::!!None
         '''))
         self.assertEqual(
-            {u'bar': None,
-             u'foo': datetime.date(2015, 11, 7)},
+            {'bar': None,
+             'foo': datetime.date(2015, 11, 7)},
             p.somedata)
 
         # What happens when value_type does not conform?
@@ -1086,10 +1218,10 @@ class DictFieldSerializerTest(InsistTest):
     def test_unicode_key_value(self):
         '''Let\'s see that unicode strings survive dump and load.
         '''
-        self.person.somedata = {u'foo\u07d0': None}
+        self.person.somedata = {'foo\u07d0': None}
         self.store.loads(self.store.dumps())
         self.assertEqual(
-            {u'foo\u07d0': None},
+            {'foo\u07d0': None},
             self.person.somedata)
 
     def test_newline(self):
@@ -1104,7 +1236,7 @@ class DictFieldSerializerTest(InsistTest):
             somedata = None
 
         p = Person()
-        p.somedata = {u'foo': 'first\nsecond\rthird\ta tab'}
+        p.somedata = {'foo': 'first\nsecond\rthird\ta tab'}
         store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
 
         self.assertEqual(
@@ -1114,7 +1246,7 @@ class DictFieldSerializerTest(InsistTest):
 
         store.loads(store.dumps())
         self.assertEqual(
-            {u'foo': u'first\nsecond\rthird\ta tab'},
+            {'foo': 'first\nsecond\rthird\ta tab'},
             p.somedata)
 
     def test_value_type_List(self):
@@ -1130,7 +1262,7 @@ class DictFieldSerializerTest(InsistTest):
             somedata = None
 
         p = Person()
-        p.somedata = {u'foo': [u'first', u'second']}
+        p.somedata = {'foo': ['first', 'second']}
         store = insist.ConfigurationStore.makeStore(p, IPerson, 'person')
 
         self.assertEqual(
@@ -1140,7 +1272,7 @@ class DictFieldSerializerTest(InsistTest):
 
         store.loads(store.dumps())
         self.assertEqual(
-            {u'foo': [u'first', u'second']},
+            {'foo': ['first', 'second']},
             p.somedata)
 
 
