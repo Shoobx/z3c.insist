@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.4.1 (unreleased)
+1.4.1 (2021-10-26)
 ------------------
 
 - Report non-existing included config files. (It helps greatly with debugging.)
