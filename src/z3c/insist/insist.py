@@ -395,6 +395,10 @@ class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
         with self.openFile(configPath, 'r') as fle:
             cfgstr = fle.read()
         includes = self.getIncludes(cfgstr)
+        for include in includes:
+            if not self.fileExists(include):
+                raise ValueError(
+                    f'Included file "{include}" (in "{configPath}") not found.')
         self.subConfig.read(includes)
         self.subConfig.read_string(cfgstr)
 

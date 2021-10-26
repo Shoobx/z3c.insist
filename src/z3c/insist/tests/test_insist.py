@@ -410,6 +410,31 @@ class SeparateFileConfigurationStoreTest(InsistTest):
         self.assertEqual(obj.test3, 'c')
 
 
+    def test_load_withMissingIncludes(self):
+        dir = tempfile.mkdtemp()
+
+        with open(os.path.join(dir, 'test.ini'), 'w') as file:
+            file.write(
+                '#include base.ini\n'
+                '[test]\n'
+                'test2 = b\n'
+                'test3 = c\n'
+            )
+
+        class NoneTestStore(insist.SeparateFileConfigurationStore):
+            def getConfigPath(self):
+                return dir
+
+        obj = NoneTestObject()
+        obj.test1 = obj.test2 = obj.test3 = None
+        store = NoneTestStore.makeStore(obj, INoneTestSchema, 'test')
+        with self.assertRaises(ValueError):
+            store.loads(
+                '[test]\n'
+                'config-file = test.ini\n\n'
+            )
+
+
 class SeparateFileCollectionConfigurationStoreTest(InsistTest):
     """Separate File Collection Configuration Store Test
 
