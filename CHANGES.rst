@@ -4,7 +4,8 @@ Changelog
 1.4.2 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Upgraded to the `watchdog` 2.1.7, which does not support the
+  `timeout` parameter in `EventDispatcher.dispatch_events()` any more.
 
 
 1.4.1 (2021-10-26)

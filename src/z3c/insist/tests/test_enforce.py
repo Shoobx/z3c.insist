@@ -61,7 +61,7 @@ class EventQueue(object):
     def __init__(self, event):
         self.event = event
 
-    def get(self, block, timeout):
+    def get(self, block):
         return self.event, ObservedWatch('./', True)
 
     def task_done(self):
@@ -161,7 +161,7 @@ class EnforcerTest(EnforcerBaseTest):
 
         # Before locking, handlers do their usual work:
         evt = enf.dispatch_events(
-            EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')), 1)
+            EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')))
         self.assertEqual(
             "<FileModifiedEvent:"
             " event_type=modified,"
@@ -171,19 +171,19 @@ class EnforcerTest(EnforcerBaseTest):
 
         # Now we are locking the directory, ...
         enf.dispatch_events(
-            EventQueue(watchdog.events.FileCreatedEvent('./lock')), 1)
+            EventQueue(watchdog.events.FileCreatedEvent('./lock')))
 
         # so no event come through:
         enf.dispatch_events(
-            EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')), 1)
+            EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')))
 
         # Once we unlock the directory, everything flows again:
         enf.dispatch_events(
-            EventQueue(watchdog.events.FileDeletedEvent('./lock')), 1)
+            EventQueue(watchdog.events.FileDeletedEvent('./lock')))
 
         self.log.__init__('')
         enf.dispatch_events(
-            EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')), 1)
+            EventQueue(watchdog.events.FileModifiedEvent('./sample.ini')))
         self.assertEqual(
             "<FileModifiedEvent:"
             " event_type=modified,"

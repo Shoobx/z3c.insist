@@ -65,7 +65,7 @@ setup(
             'pytz',
             ],
         enforce=[
-            'watchdog>=1.0.0',
+            'watchdog>=2.1.7',
             ],
         ),
     install_requires=INSTALL_REQUIRES,

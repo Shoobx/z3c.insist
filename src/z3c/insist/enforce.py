@@ -222,8 +222,8 @@ class Enforcer(watchdog.observers.Observer):
     def register(self, handler):
         self.schedule(handler, path=self.watchedDir, recursive=True)
 
-    def dispatch_events(self, event_queue, timeout):
-        event, watch = event_queue.get(block=True, timeout=timeout)
+    def dispatch_events(self, event_queue):
+        event, watch = event_queue.get(block=True)
 
         with self._lock:
             # Optimization: Ignore all dorectory modified events, since we
