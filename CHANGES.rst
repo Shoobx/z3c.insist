@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.4.2 (unreleased)
+1.4.2 (2022-04-29)
 ------------------
 
 - Upgraded to the `watchdog` 2.1.7, which does not support the
