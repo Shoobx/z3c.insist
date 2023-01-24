@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.5.0 (unreleased)
+1.5.0 (2023-01-24)
 ------------------
 
 - Relicense under ZPL-2.1.
