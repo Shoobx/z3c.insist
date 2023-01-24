@@ -1,10 +1,10 @@
 Changelog
 =========
 
-1.4.3 (unreleased)
+1.5.0 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Relicense under ZPL-2.1.
 
 
 1.4.2 (2022-04-29)

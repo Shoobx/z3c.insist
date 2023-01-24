@@ -38,8 +38,9 @@ setup(
     read_file('CHANGES.rst'),
     keywords="configuration dump serialization",
     url='http://pypi.python.org/pypi/z3c.insist',
-    license='Proprietary',
+    license='ZPL 2.1',
     classifiers=[
+        'License :: OSI Approved :: Zope Public License',
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
         'Programming Language :: Python',
