@@ -4,7 +4,7 @@ Changelog
 1.5.1 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Added support for Python 3.10 and 3.11
 
 
 1.5.0 (2023-01-24)
