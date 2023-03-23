@@ -66,7 +66,10 @@ class EnforcerEventHandler(watchdog.events.FileSystemEventHandler):
 
     def dispatch(self, event):
         if event.event_type == watchdog.events.EVENT_TYPE_OPENED:
-            # Do not update configuration for EVENT_TYPE_OPENED.
+            # Do not update configuration for EVENT_TYPE_OPENED. Doing this to avoid
+            # unnecessary processing on file open events, need this since watchdog
+            # started sending EVENT_TYPE_OPENED events. Eventually refactor dispatch
+            # and event handlers later to do work only on specific events.
             return False
         ts = time.time()
         store = self.getStoreFromEvent(event)

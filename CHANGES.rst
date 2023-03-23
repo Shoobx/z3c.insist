@@ -6,6 +6,9 @@ Changelog
 
 - Added support for Python 3.10 and 3.11
 
+- Ignored FileOpenedEvent in dispatch to avoid unnecessary processing of files.
+
+- Upgraded to the watchdog 3.0.0
 
 1.5.0 (2023-01-24)
 ------------------
