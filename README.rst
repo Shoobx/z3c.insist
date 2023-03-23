@@ -2,8 +2,8 @@
 z3c.insist -- Persistence to ini files
 ======================================
 
-.. image:: https://github.com/Shoobx/shoobx.insist/actions/workflows/tests.yml/badge.svg
-   :target: https://github.com/Shoobx/shoobx.insist/actions
+.. image:: https://github.com/Shoobx/z3c.insist/actions/workflows/tests.yml/badge.svg
+   :target: https://github.com/Shoobx/z3c.insist/actions
 
 .. image:: https://coveralls.io/repos/github/Shoobx/z3c.insist/badge.svg?branch=master
    :target: https://coveralls.io/github/Shoobx/z3c.insist?branch=master
