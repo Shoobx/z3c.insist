@@ -65,6 +65,9 @@ class EnforcerEventHandler(watchdog.events.FileSystemEventHandler):
         return event.store.getSectionFromPath(event.src_path)
 
     def dispatch(self, event):
+        if event.event_type == watchdog.events.EVENT_TYPE_OPENED:
+            # Do not update configuration for EVENT_TYPE_OPENED.
+            return False
         ts = time.time()
         store = self.getStoreFromEvent(event)
         if store is None:
@@ -226,7 +229,7 @@ class Enforcer(watchdog.observers.Observer):
         event, watch = event_queue.get(block=True)
 
         with self._lock:
-            # Optimization: Ignore all dorectory modified events, since we
+            # Optimization: Ignore all directory modified events, since we
             # cannot really do anything with those. It will also avoid
             # unnecessary transactions due to lock file action.
             if event.is_directory and \
@@ -366,7 +369,7 @@ class IncludeObserver(watchdog.observers.Observer):
         super().__init__()
 
     def initialize(self) -> None:
-        logger.info(f'Initializing Include Oberver for {self.watchedDir}')
+        logger.info(f'Initializing Include Observer for {self.watchedDir}')
         for path in pathlib.Path(self.watchedDir).rglob('*.ini'):
             self.update(path)
         self.schedule(
