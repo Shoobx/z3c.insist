@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.5.1 (unreleased)
+1.5.1 (2023-03-23)
 ------------------
 
 - Added support for Python 3.10 and 3.11
