@@ -479,6 +479,11 @@ class FileSectionsEnforcerEventHandlerTest(EnforcerBaseTest):
         self.assertTrue(handler.dispatch(evt))
         NumbersStore.deleteItem.assert_called_with('1')
 
+        # 4. File Opened, we ignore this event and do nothing.
+        store.reset_mock()
+        evt = watchdog.events.FileOpenedEvent('./path/number:1.ini')
+        self.assertFalse(handler.dispatch(evt))
+
         # If no store is found, we simply return and do nothing:
         NumbersStore.loadFromSection.reset_mock()
         evt = watchdog.events.FileCreatedEvent('./path/int:1.ini')
