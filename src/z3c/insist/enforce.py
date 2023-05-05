@@ -229,7 +229,11 @@ class Enforcer(watchdog.observers.Observer):
         self.schedule(handler, path=self.watchedDir, recursive=True)
 
     def dispatch_events(self, event_queue):
-        event, watch = event_queue.get(block=True)
+        ev =  event_queue.get(block=True)
+        if not isinstance(ev, tuple):
+            return
+        event, watch = ev
+
 
         with self._lock:
             # Optimization: Ignore all directory modified events, since we
@@ -297,8 +301,7 @@ class IncludingFilesHandler(watchdog.events.FileSystemEventHandler):
             # started sending EVENT_TYPE_OPENED events. Eventually refactor dispatch
             # and event handlers later to do work and logging only on specific events.
             return
-        print('-'*78)
-        print(event)
+        logger.info("Handling %s", event)
         if event.is_directory:
             return
 
