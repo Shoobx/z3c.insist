@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.5.2 (unreleased)
+1.5.2 (2023-05-05)
 ------------------
 
 - Ignored FileOpenedEvent in dispatch to avoid unnecessary processing of files in IncludingFilesHandler.
