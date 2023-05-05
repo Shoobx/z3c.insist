@@ -301,8 +301,7 @@ class IncludingFilesHandler(watchdog.events.FileSystemEventHandler):
             # started sending EVENT_TYPE_OPENED events. Eventually refactor dispatch
             # and event handlers later to do work and logging only on specific events.
             return
-        print('-'*78)
-        print(event)
+        logger.info("Handling %s", event)
         if event.is_directory:
             return
 
