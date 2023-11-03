@@ -15,6 +15,7 @@ import iso8601
 import json
 import logging
 import os
+import pathlib
 import re
 import zope.component
 import zope.schema
@@ -358,10 +359,11 @@ class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
     def getConfigFilename(self):
         return self.section + '.ini'
 
-    def getIncludes(self, cfgstr):
-        basePath = self.getConfigPath()
+    def getIncludes(self, cfgstr, configPath):
+        configPath = pathlib.Path(configPath)
+        # use string representation for backward compatibility
         return [
-            os.path.normpath(os.path.join(basePath, include))
+            str(pathlib.Path(configPath.parent, include).resolve())
             for include in re.findall(RE_INCLUDES, cfgstr, re.MULTILINE)
         ]
 
@@ -394,7 +396,7 @@ class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
     def _readSubConfig(self, configPath):
         with self.openFile(configPath, 'r') as fle:
             cfgstr = fle.read()
-        includes = self.getIncludes(cfgstr)
+        includes = self.getIncludes(cfgstr, configPath)
         for include in includes:
             if not self.fileExists(include):
                 raise ValueError(
