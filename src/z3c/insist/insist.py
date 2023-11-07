@@ -361,7 +361,7 @@ class SeparateFileConfigurationStoreMixIn(FilesystemMixin):
 
     def getIncludes(self, cfgstr, configPath):
         configPath = pathlib.Path(configPath)
-        # use string representation for backward compatibility
+        # use string representation for compatibility with rest of the code
         return [
             str(pathlib.Path(configPath.parent, include).resolve())
             for include in re.findall(RE_INCLUDES, cfgstr, re.MULTILINE)

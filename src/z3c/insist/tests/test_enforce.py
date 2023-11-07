@@ -193,29 +193,40 @@ class EnforcerTest(EnforcerBaseTest):
 
     def test_included(self):
 
-        baseDir = tempfile.mkdtemp('-base')
-
-        basePath = os.path.join(baseDir, 'simple-collection.ini')
-        with open(basePath, 'w') as file:
-            file.write(
-                '[simple:one]\n'
-                'text = One\n'
-                '\n'
-                '[simple:two]\n'
-                'text = Two\n'
+        baseDir = pathlib.Path(tempfile.mkdtemp('-base'))
+        basePath = baseDir.joinpath('simple-collection.ini')
+        basePath.write_text(
+            '[simple:one]\n'
+            'text = One\n'
+            '\n'
+            '[simple:two]\n'
+            'text = Two\n'
             )
 
-        confDir = tempfile.mkdtemp('-conf')
+        nestedConfDir = pathlib.Path(tempfile.mkdtemp(suffix='-nestedConf', dir=baseDir))
+        # baseDir/tmpdir-nestedConf/simple-collection.ini
+        nestedPath = nestedConfDir.joinpath('simple-collection.ini')
+        nestedPath.write_text(
+            '[simple:five]\n'
+            'text = 5\n'
+            '\n'
+            '[simple:six]\n'
+            'text = 6\n'
+            )
 
-        simplePath = os.path.join(confDir, 'simple-collection.ini')
-        with open(simplePath, 'w') as file:
-            file.write(
-                f'#include {basePath}\n'
-                '[simple:two]\n'
-                'text = 2\n'
-                '\n'
-                '[simple:three]\n'
-                'text = 3\n'
+        baseConfDir = pathlib.Path(tempfile.mkdtemp('-baseConf', dir=baseDir))
+        confDir = pathlib.Path(tempfile.mkdtemp('-conf', dir=baseConfDir))
+        simplePath = confDir.joinpath('simple-collection.ini')
+        simplePath.write_text(
+            f'#include {basePath}\n'
+            #   ../../tmpdir-nestedConf/simple-collection.ini
+            # baseDir/
+            f'#include ../../{nestedPath.relative_to(baseDir)}\n'
+            '[simple:two]\n'
+            'text = 2\n'
+            '\n'
+            '[simple:three]\n'
+            'text = 3\n'
             )
 
         coll = {}
@@ -233,7 +244,10 @@ class EnforcerTest(EnforcerBaseTest):
             item_factory = Simple
 
             def getConfigPath(self):
-                return confDir
+                return baseConfDir
+            
+            def getConfigFilename(self):
+                return simplePath.relative_to(baseConfDir)  
 
             @classmethod
             def fromRootAndFilename(cls, root, filename=None):
@@ -248,55 +262,64 @@ class EnforcerTest(EnforcerBaseTest):
             schema = ISimple
 
             def getConfigPath(self):
-                return confDir
+                return baseConfDir
 
         zope.component.provideAdapter(SimpleStore)
 
-        enf = enforce.Enforcer(confDir, coll)
+        enf = enforce.Enforcer(baseConfDir, coll)
         enf.registerHandlers()
         enf.start()
 
-        inc = enforce.IncludeObserver(confDir)
+        inc = enforce.IncludeObserver(baseConfDir)
         inc.initialize()
         inc.start()
 
         # Load the configuration when the main config file is modified.
-        pathlib.Path(simplePath).touch()
+        simplePath.touch()
         time.sleep(0.01)
-        self.assertEqual(len(coll), 3)
+        self.assertEqual(len(coll), 5)
         self.assertEqual(coll['one'].text, 'One')
         self.assertEqual(coll['two'].text, '2')
         self.assertEqual(coll['three'].text, '3')
+        self.assertEqual(coll['five'].text, '5')
+        self.assertEqual(coll['six'].text, '6')
 
         # Configuration should also be loaded when the base config file is
         # updated.
-        with open(basePath, 'w') as file:
-            file.write(
-                '[simple:one]\n'
-                'text = 1\n'
-            )
+        basePath.write_text(
+            '[simple:one]\n'
+            'text = 1\n'
+        )
         time.sleep(0.01)
-        self.assertEqual(len(coll), 3)
+        self.assertEqual(len(coll), 5)
         self.assertEqual(coll['one'].text, '1')
 
-        # Add a new base file.
-        baseDir2 = tempfile.mkdtemp('-base2')
-        basePath2 = os.path.join(baseDir2, 'simple-collection.ini')
-        with open(basePath2, 'w') as file:
-            file.write(
-                '[simple:four]\n'
-                'text = Four\n'
-            )
-        with open(simplePath, 'w') as file:
-            file.write(
-                f'#include {basePath}\n'
-                f'#include {basePath2}\n'
-                '[simple:two]\n'
-                'text = 2\n'
-                '\n'
-                '[simple:three]\n'
-                'text = 3\n'
-            )
+        # Configuration should also be loaded when base config included using
+        # relative path is updated.
+        nestedPath.write_text(
+            '[simple:five]\n'
+            'text = five\n'
+        )
+        time.sleep(0.01)
+        self.assertEqual(len(coll), 4)
+        self.assertEqual(coll['five'].text, 'five')
+
+        # Add a new base file and remove relative one.
+        baseDir2 = pathlib.Path(tempfile.mkdtemp('-base2'))
+        basePath2 = baseDir2.joinpath('simple-collection.ini')
+        basePath2.write_text(
+            '[simple:four]\n'
+            'text = Four\n'
+        )
+        simplePath.write_text(
+            f'#include {basePath}\n'
+            f'#include {basePath2}\n'
+            '[simple:two]\n'
+            'text = 2\n'
+            '\n'
+            '[simple:three]\n'
+            'text = 3\n'
+        )
         time.sleep(0.01)
 
         self.assertEqual(len(coll), 4)
@@ -306,24 +329,22 @@ class EnforcerTest(EnforcerBaseTest):
         self.assertEqual(coll['four'].text, 'Four')
 
         # Modify the newly added base.
-        with open(basePath2, 'w') as file:
-            file.write(
-                '[simple:four]\n'
-                'text = 4\n'
-            )
+        basePath2.write_text(
+            '[simple:four]\n'
+            'text = 4\n'
+        )
         time.sleep(0.01)
         self.assertEqual(coll['four'].text, '4')
 
         # Remove second base.
-        with open(simplePath, 'w') as file:
-            file.write(
-                f'#include {basePath}\n'
-                '[simple:two]\n'
-                'text = 2\n'
-                '\n'
-                '[simple:three]\n'
-                'text = 3\n'
-            )
+        simplePath.write_text(
+            f'#include {basePath}\n'
+            '[simple:two]\n'
+            'text = 2\n'
+            '\n'
+            '[simple:three]\n'
+            'text = 3\n'
+        )
         os.remove(basePath2)
         time.sleep(0.01)
 

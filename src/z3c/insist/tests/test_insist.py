@@ -11,6 +11,7 @@ import collections
 import datetime
 import doctest
 import os
+import pathlib
 import pprint
 import tempfile
 import textwrap
@@ -646,25 +647,31 @@ class FileSectionsCollectionConfigurationStoreTest(InsistTest):
         self.assertEqual(orig_hash, new_hash)
 
     def test_load_withIncludes(self):
-        dir = tempfile.mkdtemp()
+        baseDir = tempfile.mkdtemp()
 
-        with open(os.path.join(dir, 'base.ini'), 'w') as file:
-            file.write(
-                '[simple:one]\n'
-                'text = One\n'
-                '\n'
-                '[simple:two]\n'
-                'text = Two\n'
+        nestedConfDir = pathlib.Path(tempfile.mkdtemp(suffix='-nestedConf', dir=baseDir))
+        # baseDir/tmpdir-nestedConf/simple-collection.ini
+        nestedPath = nestedConfDir.joinpath('simple-collection.ini')
+        nestedPath.write_text(
+            '[simple:one]\n'
+            'text = One\n'
+            '\n'
+            '[simple:four]\n'
+            'text = Four\n'
             )
 
-        with open(os.path.join(dir, 'simple-collection.ini'), 'w') as file:
-            file.write(
-                '#include base.ini\n'
-                '[simple:two]\n'
-                'text = 2\n'
-                '\n'
-                '[simple:three]\n'
-                'text = 3\n'
+        baseConfDir = pathlib.Path(tempfile.mkdtemp('-baseConf', dir=baseDir))
+        confDir = pathlib.Path(tempfile.mkdtemp('-conf', dir=baseConfDir))
+        simplePath = confDir.joinpath('simple-collection.ini')
+        simplePath.write_text(
+            #   ../../tmpdir-nestedConf/simple-collection.ini
+            # baseDir/
+            f'#include ../../{nestedPath.relative_to(baseDir)}\n'
+            '[simple:two]\n'
+            'text = 2\n'
+            '\n'
+            '[simple:three]\n'
+            'text = 3\n'
             )
 
         class SimpleCollectionStore(
@@ -676,7 +683,10 @@ class FileSectionsCollectionConfigurationStoreTest(InsistTest):
             item_factory = Simple
 
             def getConfigPath(self):
-                return dir
+                return baseConfDir
+                        
+            def getConfigFilename(self):
+                return simplePath.relative_to(baseConfDir) 
 
         @zope.component.adapter(ISimple)
         @zope.interface.implementer(interfaces.IConfigurationStore)
@@ -685,17 +695,18 @@ class FileSectionsCollectionConfigurationStoreTest(InsistTest):
             schema = ISimple
 
             def getConfigPath(self):
-                return dir
+                return baseConfDir
 
         reg = zope.component.provideAdapter(SimpleStore)
 
         coll = {}
         store = SimpleCollectionStore(coll)
         store.loads('')
-        self.assertEqual(len(coll), 3)
+        self.assertEqual(len(coll), 4)
         self.assertEqual(coll['one'].text, 'One')
         self.assertEqual(coll['two'].text, '2')
         self.assertEqual(coll['three'].text, '3')
+        self.assertEqual(coll['four'].text, 'Four')
 
     def test_getSectionFromPath(self):
         dir = tempfile.mkdtemp()
