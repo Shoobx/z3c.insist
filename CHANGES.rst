@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.5.3 (unreleased)
+1.5.3 (2023-11-08)
 ------------------
 
 - Fix inconsistencies in calculating includes paths. Please note that signature of
