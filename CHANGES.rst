@@ -4,7 +4,8 @@ Changelog
 1.5.3 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix inconsistencies in calculating includes paths. Please note that signature of
+  SeparateFileConfigurationStoreMixIn.getIncludes has changed.
 
 
 1.5.2 (2023-05-05)
