@@ -1,10 +1,10 @@
 Changelog
 =========
 
-1.5.4 (unreleased)
+1.5.4 (2024-01-15)
 ------------------
 
-- Nothing changed yet.
+- Change generation of section to folder style
 
 
 1.5.3 (2023-11-08)
