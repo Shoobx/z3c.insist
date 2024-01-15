@@ -723,7 +723,8 @@ class FileSectionsCollectionConfigurationStoreTest(InsistTest):
 
         store = SimpleCollectionStore({})
 
-        path = os.path.join(dir, 'simple:section_name.ini')
+        path = os.path.join(dir, 'simple/section_name.ini')
+        os.makedirs(os.path.dirname(path))
         with open(path, 'w') as file:
             file.write('')
 
