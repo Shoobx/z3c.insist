@@ -28,7 +28,7 @@ def read_file(filename):
 
 setup(
     name="z3c.insist",
-    version='1.5.4.dev0',
+    version='1.5.4',
     author="Shoobx, Inc.",
     author_email="dev@shoobx.com",
     description="Persistence to ini Files",
