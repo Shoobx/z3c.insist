@@ -479,13 +479,10 @@ class FileSectionsCollectionConfigurationStore(
         return os.path.join(self.getConfigPath(), section + self.filePostfix)
 
     def getSectionFromPath(self, path):
-        dirname, section_name = os.path.split(path)
-        while '.' in section_name:
-            section_name = section_name.rsplit('.', 1)[0]
-            if self.fileExists(self.getSectionPath(section_name)):
-                return section_name
-        raise RuntimeError(
-            'Could not find valid section name in path: %s' % path)
+        fullpath = pathlib.Path(path)
+        section = fullpath.parent.name
+        name = fullpath.stem
+        return ":".join((section, name))
 
     def selectSections(self, sections):
         baseDir = self.getConfigPath()
