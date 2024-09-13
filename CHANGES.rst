@@ -4,7 +4,7 @@ Changelog
 1.5.5 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix: Whitelist events instead of blacklisting some, watchdog added EVENT_TYPE_CLOSED_NO_WRITE
 
 
 1.5.4 (2024-01-15)
