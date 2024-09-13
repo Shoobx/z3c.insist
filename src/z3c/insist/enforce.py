@@ -23,6 +23,17 @@ from z3c.insist import interfaces, insist
 
 logger = logging.getLogger('z3c.insist.enforcer')
 
+# Whitelist events instead of blacklisting some
+EVENTS_CONSUMED = [
+    watchdog.events.EVENT_TYPE_MOVED,
+    watchdog.events.EVENT_TYPE_DELETED,
+    watchdog.events.EVENT_TYPE_CREATED,
+    watchdog.events.EVENT_TYPE_MODIFIED,
+    # watchdog.events.EVENT_TYPE_CLOSED,
+    # watchdog.events.EVENT_TYPE_CLOSED_NO_WRITE,
+    # watchdog.events.EVENT_TYPE_OPENED,
+]
+
 
 class EnforcerFileSectionsCollectionStore(object):
 
@@ -65,16 +76,13 @@ class EnforcerEventHandler(watchdog.events.FileSystemEventHandler):
         return event.store.getSectionFromPath(event.src_path)
 
     def dispatch(self, event):
-        if event.event_type == watchdog.events.EVENT_TYPE_OPENED:
-            # Do not update configuration for EVENT_TYPE_OPENED. Doing this to avoid
-            # unnecessary processing on file open events, need this since watchdog
-            # started sending EVENT_TYPE_OPENED events. Eventually refactor dispatch
-            # and event handlers later to do work and logging only on specific events.
+        if event.event_type not in EVENTS_CONSUMED:
             return False
         ts = time.time()
         store = self.getStoreFromEvent(event)
         if store is None:
             return False
+        logger.info("Handling %s", event)
         event.store = store
         event.section = self.getSectionFromEvent(event)
         super(EnforcerEventHandler, self).dispatch(event)
@@ -295,15 +303,11 @@ class IncludingFilesHandler(watchdog.events.FileSystemEventHandler):
         self.incObserver = incObserver
 
     def dispatch(self, event):
-        if event.event_type == watchdog.events.EVENT_TYPE_OPENED:
-            # Do not update configuration for EVENT_TYPE_OPENED. Doing this to avoid
-            # unnecessary processing on file open events, need this since watchdog
-            # started sending EVENT_TYPE_OPENED events. Eventually refactor dispatch
-            # and event handlers later to do work and logging only on specific events.
+        if event.event_type not in EVENTS_CONSUMED:
             return
-        logger.info("Handling %s", event)
         if event.is_directory:
             return
+        logger.info("Handling %s", event)
 
         if match_any_paths([os.fsdecode(event.src_path)],
                            included_patterns=self.patterns,
