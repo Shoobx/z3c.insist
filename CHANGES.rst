@@ -4,7 +4,7 @@ Changelog
 1.5.7 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix: event_filter type is a FileSystemEvent not a string
 
 
 1.5.6 (2024-10-16)
