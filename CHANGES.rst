@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.5.6 (Unreleased)
+1.5.6 (2024-10-16)
 ------------------
 
 - Fix: Filter events for EVENTS_CONSUMED
