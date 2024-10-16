@@ -234,7 +234,7 @@ class Enforcer(watchdog.observers.Observer):
             self.register(handler)
 
     def register(self, handler):
-        self.schedule(handler, path=self.watchedDir, recursive=True)
+        self.schedule(handler, path=self.watchedDir, recursive=True, event_filter=EVENTS_CONSUMED)
 
     def dispatch_events(self, event_queue):
         ev =  event_queue.get(block=True)
